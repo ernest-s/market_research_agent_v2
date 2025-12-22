@@ -1,0 +1,7 @@
+streamlit==1.51.0
+langgraph==1.0.4
+langchain==1.1.0
+langchain_core==1.1.0
+dotenv==0.9.9
+langchain_openai==1.1.0
+openai==2.8.1

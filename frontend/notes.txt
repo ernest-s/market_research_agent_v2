@@ -1,0 +1,25 @@
+https://dev-27pe1ffaoilblt25.us.auth0.com/v2/logout
+Command to create node_modules: npm install
+
+
+To create & Start Postgres container
+docker run --name qual-postgres \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=qual_db \
+  -p 5432:5432 \
+  -d postgres:15
+
+
+npm install
+npx prisma generate
+npx prisma migrate dev
+
+
+# Start Docker from terminal
+docker start qual-postgres
+
+
+# Access Prisma Studio
+npx prisma studio
+

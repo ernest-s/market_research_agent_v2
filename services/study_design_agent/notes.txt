@@ -1,0 +1,5 @@
+Python 3.11
+conda environment - marketing_ai
+conda activate marketing_ai
+
+streamlit run src/streamlit_app.py --server.port 8502

@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  auth0Sub  String   @unique
+  email     String   @unique
+
+  firstName String?
+  lastName  String?
+
+  role      UserRole @default(MEMBER)
+
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+
+  studies   Study[]  @relation("UserStudies")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+
+model Company {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  domain    String?
+
+  users     User[]
+  studies   Study[] @relation("CompanyStudies")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+
+model Study {
+  id     String      @id @default(uuid())
+  title  String
+  status StudyStatus @default(DRAFT)
+
+  companyId String
+  company   Company @relation("CompanyStudies", fields: [companyId], references: [id])
+
+  createdById String
+  createdBy   User   @relation("UserStudies", fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum UserRole {
+  ADMIN
+  MEMBER
+}
+
+enum StudyStatus {
+  DRAFT
+  ACTIVE
+  COMPLETED
+}

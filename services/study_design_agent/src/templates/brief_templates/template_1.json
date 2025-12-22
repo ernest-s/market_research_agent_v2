@@ -1,0 +1,25 @@
+{
+  "template_id": "brief_1",
+  "template_name": "brief_template_1",
+
+  "header": {
+    "repeat": "all_pages",
+    "elements": [
+      {
+        "id": "logo",
+        "type": "image",
+        "image_path": "src/templates/images/dib_logo.jpg",
+        "position": "top-right"
+      }
+    ]
+  },
+
+  "sections": [
+    {
+      "id": "section_A",
+      "title": "Key Information",
+      "type": "table",
+      "position": "centered"
+    }
+  ]
+}
