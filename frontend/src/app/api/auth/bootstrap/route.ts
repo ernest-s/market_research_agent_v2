@@ -30,24 +30,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const enforceVerification =
-      process.env.NEXT_PUBLIC_ENFORCE_EMAIL_VERIFICATION === "true";
+    const { sub, email, email_verified } = decoded;
 
-    if (enforceVerification && decoded.email_verified !== true) {
-      return NextResponse.json(
-        { error: "Email not verified" },
-        { status: 403 }
-      );
-    }
-
-    const { sub, email } = decoded;
-
-    // 3️⃣ Try lookup by auth0Sub first
+    // 3️⃣ Always provision user first
     let user = await prisma.user.findUnique({
       where: { auth0Sub: sub },
     });
 
-    // 4️⃣ If not found, try linking by email
     if (!user) {
       const existingByEmail = await prisma.user.findUnique({
         where: { email },
@@ -68,6 +57,20 @@ export async function POST(req: NextRequest) {
           },
         });
       }
+    }
+
+    // 4️⃣ Enforce email verification AFTER provisioning
+    const enforceVerification =
+      process.env.NEXT_PUBLIC_ENFORCE_EMAIL_VERIFICATION === "true";
+
+    if (enforceVerification && email_verified !== true) {
+      return NextResponse.json(
+        {
+          error: "Email not verified",
+          user,
+        },
+        { status: 403 }
+      );
     }
 
     return NextResponse.json({ user });
