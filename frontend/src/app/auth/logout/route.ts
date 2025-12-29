@@ -1,24 +1,57 @@
 // src/app/auth/logout/route.ts
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
-export function GET() {
-  const issuerBaseUrl = process.env.AUTH0_ISSUER_BASE_URL!;
-  const clientId = process.env.AUTH0_CLIENT_ID!;
-  const returnTo = process.env.AUTH0_BASE_URL!;
+export async function GET(req: NextRequest) {
+  try {
+    /**
+     * 1️⃣ Revoke app session (if exists)
+     */
+    const sessionId = req.cookies.get("app_session_id")?.value;
 
-  const logoutUrl =
-    `${issuerBaseUrl}/v2/logout` +
-    `?client_id=${encodeURIComponent(clientId)}` +
-    `&returnTo=${encodeURIComponent(returnTo)}`;
+    if (sessionId) {
+      await prisma.session.updateMany({
+        where: {
+          id: sessionId,
+          revokedAt: null,
+        },
+        data: {
+          revokedAt: new Date(),
+          revokedReason: "LOGOUT",
+        },
+      });
+    }
 
-  const res = NextResponse.redirect(logoutUrl);
+    /**
+     * 2️⃣ Build Auth0 logout URL
+     */
+    const issuerBaseUrl = process.env.AUTH0_ISSUER_BASE_URL!;
+    const clientId = process.env.AUTH0_CLIENT_ID!;
+    const returnTo =
+      process.env.AUTH0_BASE_URL || "http://localhost:3000/login";
 
-  // 🔒 Prevent caching
-  res.headers.set("Cache-Control", "no-store");
+    const logoutUrl =
+      `${issuerBaseUrl}/v2/logout` +
+      `?client_id=${encodeURIComponent(clientId)}` +
+      `&returnTo=${encodeURIComponent(returnTo)}`;
 
-  // 🧹 Clear app-level cookies (if any)
-  res.cookies.delete("auth0_id_token");
-  res.cookies.delete("auth0_session");
+    /**
+     * 3️⃣ Redirect to Auth0 logout
+     */
+    const res = NextResponse.redirect(logoutUrl);
 
-  return res;
+    // 🔒 Prevent caching
+    res.headers.set("Cache-Control", "no-store");
+
+    // 🧹 Clear app session cookie
+    res.cookies.set("app_session_id", "", {
+      path: "/",
+      maxAge: 0,
+    });
+
+    return res;
+  } catch (err) {
+    console.error("Logout error:", err);
+    return NextResponse.redirect("/login");
+  }
 }

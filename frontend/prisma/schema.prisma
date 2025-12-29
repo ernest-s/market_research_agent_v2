@@ -21,11 +21,30 @@ model User {
   company   Company? @relation(fields: [companyId], references: [id])
 
   studies   Study[]  @relation("UserStudies")
+  sessions  Session[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
+model Session {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime @default(now())
+  lastSeenAt    DateTime @default(now())
+  expiresAt     DateTime
+  revokedAt     DateTime?
+
+  revokedReason SessionRevokedReason?
+
+  userAgent     String?
+  ipAddress     String?
+
+  @@index([userId])
+  @@index([expiresAt])
+}
 
 model Company {
   id        String   @id @default(uuid())
@@ -39,20 +58,19 @@ model Company {
   updatedAt DateTime @updatedAt
 }
 
-
 model Study {
-  id     String      @id @default(uuid())
-  title  String
-  status StudyStatus @default(DRAFT)
+  id           String      @id @default(uuid())
+  title        String
+  status       StudyStatus @default(DRAFT)
 
-  companyId String
-  company   Company @relation("CompanyStudies", fields: [companyId], references: [id])
+  companyId    String
+  company      Company @relation("CompanyStudies", fields: [companyId], references: [id])
 
-  createdById String
-  createdBy   User   @relation("UserStudies", fields: [createdById], references: [id])
+  createdById  String
+  createdBy    User   @relation("UserStudies", fields: [createdById], references: [id])
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 enum UserRole {
@@ -64,4 +82,10 @@ enum StudyStatus {
   DRAFT
   ACTIVE
   COMPLETED
+}
+
+enum SessionRevokedReason {
+  LOGOUT
+  OVERRIDDEN
+  TIMEOUT
 }

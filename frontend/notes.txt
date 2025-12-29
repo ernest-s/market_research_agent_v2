@@ -23,3 +23,14 @@ docker start qual-postgres
 # Access Prisma Studio
 npx prisma studio
 
+# Single session enforecement
+Add this block of code for all authenticated pages
+
+const sessionId = req.cookies.get("app_session_id")?.value;
+const session = await requireSession(sessionId);
+
+if (!session) {
+  return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+}
+
+Please refer src/app/api/user/profile/route.ts file for example usage

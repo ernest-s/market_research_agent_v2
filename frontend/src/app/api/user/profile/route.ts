@@ -1,43 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { prisma } from "@/lib/prisma";
-
-type IdTokenPayload = {
-  sub?: string;
-  email?: string;
-  email_verified?: boolean;
-};
-
-/**
- * Extract and decode ID token from cookie
- */
-function getAuthFromRequest(req: NextRequest): IdTokenPayload | null {
-  const token = req.cookies.get("auth0_id_token")?.value;
-  if (!token) return null;
-
-  const decoded = jwt.decode(token) as IdTokenPayload | null;
-  if (!decoded?.sub) return null;
-
-  return decoded;
-}
+import { requireSession } from "@/lib/requireSession";
 
 /**
  * GET /api/user/profile
  * ❌ MUST NOT enforce email verification
+ * 🔒 MUST enforce valid app session
  */
 export async function GET(req: NextRequest) {
   try {
-    const auth = getAuthFromRequest(req);
+    /**
+     * 1️⃣ Require valid app session
+     */
+    const sessionId = req.cookies.get("app_session_id")?.value ?? null;
+    const session = await requireSession(sessionId);
 
-    if (!auth) {
+    if (!session) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
     }
 
+    /**
+     * 2️⃣ Load user profile
+     */
     const user = await prisma.user.findUnique({
-      where: { auth0Sub: auth.sub },
+      where: { id: session.userId },
       include: { company: true },
     });
 
@@ -66,42 +55,45 @@ export async function GET(req: NextRequest) {
 /**
  * PATCH /api/user/profile
  * ✅ Email verification enforced here
+ * 🔒 MUST enforce valid app session
  */
 export async function PATCH(req: NextRequest) {
   try {
-    const auth = getAuthFromRequest(req);
+    /**
+     * 1️⃣ Require valid app session
+     */
+    const sessionId = req.cookies.get("app_session_id")?.value ?? null;
+    const session = await requireSession(sessionId);
 
-    if (!auth) {
+    if (!session) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
     }
 
+    /**
+     * 2️⃣ Enforce email verification (unchanged behavior)
+     */
     const enforceVerification =
       process.env.NEXT_PUBLIC_ENFORCE_EMAIL_VERIFICATION === "true";
 
-    if (enforceVerification && auth.email_verified !== true) {
+    if (enforceVerification && session.user.emailVerified !== true) {
       return NextResponse.json(
         { error: "Email not verified" },
         { status: 403 }
       );
     }
 
+    /**
+     * 3️⃣ Parse request body
+     */
     const { firstName, lastName, companyName } = await req.json();
 
-    const user = await prisma.user.findUnique({
-      where: { auth0Sub: auth.sub },
-    });
-
-    if (!user) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
-      );
-    }
-
-    let companyId: string | null = user.companyId;
+    /**
+     * 4️⃣ Resolve company (unchanged logic)
+     */
+    let companyId: string | null = session.user.companyId;
 
     if (typeof companyName === "string") {
       const trimmed = companyName.trim();
@@ -125,8 +117,11 @@ export async function PATCH(req: NextRequest) {
       }
     }
 
+    /**
+     * 5️⃣ Update user
+     */
     const updatedUser = await prisma.user.update({
-      where: { id: user.id },
+      where: { id: session.userId },
       data: {
         firstName: firstName ?? null,
         lastName: lastName ?? null,
