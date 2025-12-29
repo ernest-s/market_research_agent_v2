@@ -1,21 +1,32 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+
+type Profile = {
+  firstName?: string | null;
+  lastName?: string | null;
+  companyName?: string | null;
+};
 
 export default function ProfilePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  const passwordSent = searchParams.get("passwordSent") === "1";
 
   const [loading, setLoading] = useState(true);
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [companyName, setCompanyName] = useState("");
-
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const [profile, setProfile] = useState<Profile>({
+    firstName: "",
+    lastName: "",
+    companyName: "",
+  });
+
   /**
-   * 1️⃣ Load profile from backend (auth enforced server-side)
+   * 1️⃣ Load account data
    */
   useEffect(() => {
     const loadProfile = async () => {
@@ -37,12 +48,14 @@ export default function ProfilePage() {
         }
 
         const data = await res.json();
-        setFirstName(data.firstName || "");
-        setLastName(data.lastName || "");
-        setCompanyName(data.companyName || "");
+        setProfile({
+          firstName: data.firstName ?? "",
+          lastName: data.lastName ?? "",
+          companyName: data.companyName ?? "",
+        });
       } catch (err) {
-        console.error("Failed to load profile", err);
-        setError("Failed to load profile.");
+        console.error(err);
+        setError("Failed to load account details.");
       } finally {
         setLoading(false);
       }
@@ -52,7 +65,7 @@ export default function ProfilePage() {
   }, [router]);
 
   /**
-   * 2️⃣ Save handler
+   * 2️⃣ Save profile
    */
   const handleSave = async () => {
     setSaving(true);
@@ -61,42 +74,23 @@ export default function ProfilePage() {
     try {
       const res = await fetch("/api/user/profile", {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          firstName,
-          lastName,
-          companyName,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profile),
       });
 
-      if (res.status === 401) {
-        router.replace("/login");
-        return;
-      }
-
-      if (res.status === 403) {
-        router.replace("/verify-email");
-        return;
-      }
-
       if (!res.ok) {
-        throw new Error("Failed to save profile");
+        throw new Error("Save failed");
       }
 
       router.replace("/dashboard");
     } catch (err) {
-      console.error("Save profile error:", err);
-      setError("Failed to save profile. Please try again.");
+      console.error(err);
+      setError("Failed to save changes.");
     } finally {
       setSaving(false);
     }
   };
 
-  /**
-   * 🔒 Unified loading guard
-   */
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -105,41 +99,50 @@ export default function ProfilePage() {
     );
   }
 
-  /**
-   * 3️⃣ Profile UI
-   */
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="h-16 bg-white border-b flex items-center px-6">
-        <h1 className="text-xl font-semibold">Update Profile</h1>
+      {/* HEADER */}
+      <header className="h-16 bg-white border-b flex items-center px-6 gap-4">
+        <button
+          onClick={() => router.replace("/dashboard")}
+          className="text-sm text-gray-600 hover:text-black"
+        >
+          ← Back
+        </button>
+        <h1 className="text-xl font-semibold">Account</h1>
       </header>
 
-      <main className="max-w-xl mx-auto p-8">
-        <div className="bg-white rounded-lg shadow-sm border p-6 space-y-6">
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              First name
-            </label>
-            <input
-              type="text"
-              value={firstName}
-              onChange={(e) => setFirstName(e.target.value)}
-              className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring focus:ring-gray-200"
-              placeholder="Optional"
-            />
-          </div>
+      <main className="max-w-3xl mx-auto p-8 space-y-8">
+        {/* PROFILE */}
+        <section className="bg-white border rounded-lg p-6 space-y-6">
+          <h2 className="text-lg font-semibold">Profile</h2>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Last name
-            </label>
-            <input
-              type="text"
-              value={lastName}
-              onChange={(e) => setLastName(e.target.value)}
-              className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring focus:ring-gray-200"
-              placeholder="Optional"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                First name
+              </label>
+              <input
+                value={profile.firstName ?? ""}
+                onChange={(e) =>
+                  setProfile({ ...profile, firstName: e.target.value })
+                }
+                className="w-full border rounded-md px-3 py-2"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Last name
+              </label>
+              <input
+                value={profile.lastName ?? ""}
+                onChange={(e) =>
+                  setProfile({ ...profile, lastName: e.target.value })
+                }
+                className="w-full border rounded-md px-3 py-2"
+              />
+            </div>
           </div>
 
           <div>
@@ -147,36 +150,56 @@ export default function ProfilePage() {
               Company
             </label>
             <input
-              type="text"
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              className="w-full border rounded-md px-3 py-2 focus:outline-none focus:ring focus:ring-gray-200"
-              placeholder="Optional"
+              value={profile.companyName ?? ""}
+              onChange={(e) =>
+                setProfile({ ...profile, companyName: e.target.value })
+              }
+              className="w-full border rounded-md px-3 py-2"
             />
           </div>
 
-          {error && (
-            <p className="text-sm text-red-600">{error}</p>
-          )}
+          {error && <p className="text-sm text-red-600">{error}</p>}
 
-          <div className="pt-4 flex justify-end gap-3">
-            <button
-              onClick={() => router.replace("/dashboard")}
-              className="px-5 py-2 rounded-md border text-gray-700 hover:bg-gray-100"
-            >
-              Cancel
-            </button>
-
+          <div className="flex justify-end">
             <button
               onClick={handleSave}
               disabled={saving}
-              className="bg-black text-white px-5 py-2 rounded-md
-                hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-black text-white rounded-md disabled:opacity-50"
             >
               {saving ? "Saving..." : "Save changes"}
             </button>
           </div>
-        </div>
+        </section>
+
+        {/* SECURITY */}
+        <section className="bg-white border rounded-lg p-6 space-y-4">
+          <h2 className="text-lg font-semibold">Security</h2>
+
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="font-medium">Password</p>
+
+              {passwordSent ? (
+                <p className="text-sm text-green-700 mt-1">
+                  Password reset email sent. Please check your inbox.
+                </p>
+              ) : (
+                <p className="text-sm text-gray-600 mt-1">
+                  Change your account password.
+                </p>
+              )}
+            </div>
+
+            {!passwordSent && (
+              <a
+                href="/auth/change-password"
+                className="text-sm underline"
+              >
+                Change password
+              </a>
+            )}
+          </div>
+        </section>
       </main>
     </div>
   );
