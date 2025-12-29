@@ -1,21 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
 
-/**
- * Extract Auth0 subject from access token
- */
-function getAuth0Sub(req: NextRequest): string | null {
-  const authHeader = req.headers.get("authorization");
-  if (!authHeader?.startsWith("Bearer ")) return null;
-
-  try {
-    const token = authHeader.replace("Bearer ", "");
-    const decoded = jwt.decode(token) as { sub?: string } | null;
-    return decoded?.sub ?? null;
-  } catch {
-    return null;
-  }
-}
+type IdTokenPayload = {
+  sub?: string;
+};
 
 /**
  * Get Auth0 Management API token
@@ -36,6 +24,8 @@ async function getManagementToken(): Promise<string> {
   );
 
   if (!res.ok) {
+    const text = await res.text();
+    console.error("Failed to obtain management token:", text);
     throw new Error("Failed to obtain Auth0 management token");
   }
 
@@ -45,17 +35,30 @@ async function getManagementToken(): Promise<string> {
 
 export async function POST(req: NextRequest) {
   try {
-    const auth0Sub = getAuth0Sub(req);
+    // 1️⃣ Read ID token from cookie (same as bootstrap)
+    const idToken = req.cookies.get("auth0_id_token")?.value;
 
-    if (!auth0Sub) {
+    if (!idToken) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
     }
 
+    // 2️⃣ Decode token to get Auth0 user id
+    const decoded = jwt.decode(idToken) as IdTokenPayload | null;
+
+    if (!decoded?.sub) {
+      return NextResponse.json(
+        { error: "Invalid token" },
+        { status: 401 }
+      );
+    }
+
+    // 3️⃣ Get Auth0 Management API token
     const mgmtToken = await getManagementToken();
 
+    // 4️⃣ Trigger verification email
     const res = await fetch(
       `https://${process.env.AUTH0_MANAGEMENT_DOMAIN}/api/v2/jobs/verification-email`,
       {
@@ -65,7 +68,7 @@ export async function POST(req: NextRequest) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          user_id: auth0Sub,
+          user_id: decoded.sub,
         }),
       }
     );
