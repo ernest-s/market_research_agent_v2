@@ -1,0 +1,13 @@
+{
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "services"
+  ],
+  "dependencies": {
+    "@prisma/client": "6.19.1"
+  },
+  "devDependencies": {
+    "prisma": "6.19.1"
+  }
+}

@@ -54,7 +54,7 @@ export async function GET(req: NextRequest) {
 
 /**
  * PATCH /api/user/profile
- * ✅ Email verification enforced here
+ * ❌ Email verification NOT enforced
  * 🔒 MUST enforce valid app session
  */
 export async function PATCH(req: NextRequest) {
@@ -73,25 +73,12 @@ export async function PATCH(req: NextRequest) {
     }
 
     /**
-     * 2️⃣ Enforce email verification (unchanged behavior)
-     */
-    const enforceVerification =
-      process.env.NEXT_PUBLIC_ENFORCE_EMAIL_VERIFICATION === "true";
-
-    if (enforceVerification && session.user.emailVerified !== true) {
-      return NextResponse.json(
-        { error: "Email not verified" },
-        { status: 403 }
-      );
-    }
-
-    /**
-     * 3️⃣ Parse request body
+     * 2️⃣ Parse request body
      */
     const { firstName, lastName, companyName } = await req.json();
 
     /**
-     * 4️⃣ Resolve company (unchanged logic)
+     * 3️⃣ Resolve company (unchanged logic)
      */
     let companyId: string | null = session.user.companyId;
 
@@ -118,7 +105,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     /**
-     * 5️⃣ Update user
+     * 4️⃣ Update user
      */
     const updatedUser = await prisma.user.update({
       where: { id: session.userId },
