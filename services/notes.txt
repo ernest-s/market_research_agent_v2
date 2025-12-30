@@ -1,0 +1,4 @@
+# How to test session clean up cron job
+npx ts-node services/cron/cleanupSessions.ts
+# or the following command (script added to package.json on root folder)
+npm run cron:cleanup-sessions
