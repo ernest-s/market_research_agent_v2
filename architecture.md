@@ -89,6 +89,25 @@ Key fields:
 3. Session ID stored as HttpOnly cookie
 4. All authenticated APIs validate session via `requireSession`
 
+### Sliding Inactivity Timeout
+
+Sessions enforce a **strict sliding inactivity timeout** controlled by the
+`SESSION_TIMEOUT_MINUTES` environment variable.
+
+Behavior:
+
+* `lastSeenAt` tracks the timestamp of the **last successful authenticated request**
+* If **no backend activity** occurs within the configured timeout window:
+  * The **first request after inactivity fails**
+  * The session is immediately revoked with reason `TIMEOUT`
+  * The user is redirected to `/login`
+* Sessions are **only refreshed if already valid**
+* No request can resurrect an expired session
+
+This ensures true inactivity-based logout semantics consistent with
+enterprise SaaS security expectations.
+
+
 ---
 
 ## Single-Session Enforcement
