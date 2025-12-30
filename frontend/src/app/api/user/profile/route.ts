@@ -23,11 +23,14 @@ export async function GET(req: NextRequest) {
     }
 
     /**
-     * 2️⃣ Load user profile
+     * 2️⃣ Load user profile with corporate context
      */
     const user = await prisma.user.findUnique({
       where: { id: session.userId },
-      include: { company: true },
+      include: {
+        company: true,
+        corporateAccount: true,
+      },
     });
 
     if (!user) {
@@ -37,11 +40,15 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    const isCorporateUser = Boolean(user.corporateAccountId);
+
     return NextResponse.json({
       email: user.email,
       firstName: user.firstName,
       lastName: user.lastName,
       companyName: user.company?.name ?? "",
+      accountType: isCorporateUser ? "CORPORATE" : "INDIVIDUAL",
+      isCompanyEditable: !isCorporateUser,
     });
   } catch (err) {
     console.error("Get profile error:", err);
@@ -73,16 +80,37 @@ export async function PATCH(req: NextRequest) {
     }
 
     /**
-     * 2️⃣ Parse request body
+     * 2️⃣ Load user with corporate context
+     */
+    const user = await prisma.user.findUnique({
+      where: { id: session.userId },
+      include: {
+        company: true,
+        corporateAccount: true,
+      },
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
+
+    const isCorporateUser = Boolean(user.corporateAccountId);
+
+    /**
+     * 3️⃣ Parse request body
      */
     const { firstName, lastName, companyName } = await req.json();
 
     /**
-     * 3️⃣ Resolve company (unchanged logic)
+     * 4️⃣ Resolve company
+     * ❌ Corporate users cannot change company
      */
-    let companyId: string | null = session.user.companyId;
+    let companyId: string | null = user.companyId;
 
-    if (typeof companyName === "string") {
+    if (!isCorporateUser && typeof companyName === "string") {
       const trimmed = companyName.trim();
 
       if (!trimmed) {
@@ -105,16 +133,19 @@ export async function PATCH(req: NextRequest) {
     }
 
     /**
-     * 4️⃣ Update user
+     * 5️⃣ Update user
      */
     const updatedUser = await prisma.user.update({
-      where: { id: session.userId },
+      where: { id: user.id },
       data: {
         firstName: firstName ?? null,
         lastName: lastName ?? null,
         companyId,
       },
-      include: { company: true },
+      include: {
+        company: true,
+        corporateAccount: true,
+      },
     });
 
     return NextResponse.json({
@@ -122,6 +153,8 @@ export async function PATCH(req: NextRequest) {
       firstName: updatedUser.firstName,
       lastName: updatedUser.lastName,
       companyName: updatedUser.company?.name ?? "",
+      accountType: isCorporateUser ? "CORPORATE" : "INDIVIDUAL",
+      isCompanyEditable: !isCorporateUser,
     });
   } catch (err) {
     console.error("Update profile error:", err);

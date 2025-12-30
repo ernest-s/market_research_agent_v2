@@ -7,6 +7,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/* =========================
+   USER
+========================= */
+
 model User {
   id        String   @id @default(uuid())
   auth0Sub  String   @unique
@@ -17,8 +21,13 @@ model User {
 
   role      UserRole @default(MEMBER)
 
+  /* Individual company association (profile-level) */
   companyId String?
   company   Company? @relation(fields: [companyId], references: [id])
+
+  /* Corporate membership (explicit opt-in) */
+  corporateAccountId String?
+  corporateAccount   CorporateAccount? @relation(fields: [corporateAccountId], references: [id])
 
   studies   Study[]  @relation("UserStudies")
   sessions  Session[]
@@ -26,6 +35,10 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+/* =========================
+   SESSION
+========================= */
 
 model Session {
   id            String   @id @default(uuid())
@@ -46,6 +59,10 @@ model Session {
   @@index([expiresAt])
 }
 
+/* =========================
+   COMPANY (Neutral entity)
+========================= */
+
 model Company {
   id        String   @id @default(uuid())
   name      String   @unique
@@ -54,9 +71,35 @@ model Company {
   users     User[]
   studies   Study[] @relation("CompanyStudies")
 
+  /* Optional corporate link */
+  corporateAccount CorporateAccount?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+/* =========================
+   CORPORATE ACCOUNT
+========================= */
+
+model CorporateAccount {
+  id            String   @id @default(uuid())
+  name          String
+  companyId     String   @unique
+  company       Company  @relation(fields: [companyId], references: [id])
+
+  billingEmail  String?
+  status        CorporateStatus @default(ACTIVE)
+
+  users         User[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+/* =========================
+   STUDY
+========================= */
 
 model Study {
   id           String      @id @default(uuid())
@@ -73,6 +116,10 @@ model Study {
   updatedAt    DateTime @updatedAt
 }
 
+/* =========================
+   ENUMS
+========================= */
+
 enum UserRole {
   ADMIN
   MEMBER
@@ -88,4 +135,10 @@ enum SessionRevokedReason {
   LOGOUT
   OVERRIDDEN
   TIMEOUT
+}
+
+enum CorporateStatus {
+  ACTIVE
+  SUSPENDED
+  TERMINATED
 }

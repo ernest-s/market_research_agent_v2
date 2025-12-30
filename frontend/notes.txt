@@ -37,3 +37,6 @@ Please refer src/app/api/user/profile/route.ts file for example usage
 
 # Right now there are two folders 'frontend' and 'services'
 # If a new folder is added to the root in future, update package.json in the root folder
+
+# Run psql 
+docker exec -it qual-postgres psql -U postgres -d qual_db

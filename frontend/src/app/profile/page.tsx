@@ -9,6 +9,11 @@ type Profile = {
   companyName?: string | null;
 };
 
+type AccountMeta = {
+  accountType: "INDIVIDUAL" | "CORPORATE";
+  isCompanyEditable: boolean;
+};
+
 export default function ProfilePage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -23,6 +28,11 @@ export default function ProfilePage() {
     firstName: "",
     lastName: "",
     companyName: "",
+  });
+
+  const [accountMeta, setAccountMeta] = useState<AccountMeta>({
+    accountType: "INDIVIDUAL",
+    isCompanyEditable: true,
   });
 
   /**
@@ -48,10 +58,16 @@ export default function ProfilePage() {
         }
 
         const data = await res.json();
+
         setProfile({
           firstName: data.firstName ?? "",
           lastName: data.lastName ?? "",
           companyName: data.companyName ?? "",
+        });
+
+        setAccountMeta({
+          accountType: data.accountType,
+          isCompanyEditable: data.isCompanyEditable,
         });
       } catch (err) {
         console.error(err);
@@ -145,17 +161,28 @@ export default function ProfilePage() {
             </div>
           </div>
 
+          {/* COMPANY */}
           <div>
             <label className="block text-sm font-medium mb-1">
               Company
             </label>
             <input
               value={profile.companyName ?? ""}
+              disabled={!accountMeta.isCompanyEditable}
               onChange={(e) =>
                 setProfile({ ...profile, companyName: e.target.value })
               }
-              className="w-full border rounded-md px-3 py-2"
+              className={`w-full border rounded-md px-3 py-2 ${
+                !accountMeta.isCompanyEditable
+                  ? "bg-gray-100 text-gray-600 cursor-not-allowed"
+                  : ""
+              }`}
             />
+            {!accountMeta.isCompanyEditable && (
+              <p className="text-xs text-gray-500 mt-1">
+                Managed by your organization
+              </p>
+            )}
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}

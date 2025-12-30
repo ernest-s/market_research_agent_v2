@@ -31,6 +31,10 @@ export async function POST(req: NextRequest) {
      */
     let user = await prisma.user.findUnique({
       where: { auth0Sub: sub },
+      include: {
+        company: true,
+        corporateAccount: true,
+      },
     });
 
     if (!user) {
@@ -42,10 +46,18 @@ export async function POST(req: NextRequest) {
         user = await prisma.user.update({
           where: { id: existingByEmail.id },
           data: { auth0Sub: sub },
+          include: {
+            company: true,
+            corporateAccount: true,
+          },
         });
       } else {
         user = await prisma.user.create({
           data: { auth0Sub: sub, email },
+          include: {
+            company: true,
+            corporateAccount: true,
+          },
         });
       }
     }
@@ -64,13 +76,29 @@ export async function POST(req: NextRequest) {
     }
 
     /**
-     * 4️⃣ Read current app session cookie
+     * 4️⃣ Determine account context
+     */
+    const isCorporateUser = Boolean(user.corporateAccountId);
+
+    const accountContext = {
+      accountType: isCorporateUser ? "CORPORATE" : "INDIVIDUAL",
+      corporateAccount: isCorporateUser
+        ? {
+            id: user.corporateAccount!.id,
+            name: user.corporateAccount!.name,
+            status: user.corporateAccount!.status,
+          }
+        : null,
+    };
+
+    /**
+     * 5️⃣ Read current app session cookie
      */
     const currentSessionId =
       req.cookies.get("app_session_id")?.value ?? null;
 
     /**
-     * 5️⃣ Find active session
+     * 6️⃣ Find active session
      */
     const activeSession = await prisma.session.findFirst({
       where: {
@@ -82,7 +110,7 @@ export async function POST(req: NextRequest) {
     });
 
     /**
-     * 6️⃣ Conflict only if session belongs to ANOTHER browser
+     * 7️⃣ Conflict only if session belongs to ANOTHER browser
      */
     if (
       activeSession &&
@@ -103,7 +131,7 @@ export async function POST(req: NextRequest) {
     }
 
     /**
-     * 7️⃣ Create session ONLY if none exists
+     * 8️⃣ Create session ONLY if none exists
      */
     let session = activeSession;
 
@@ -120,9 +148,12 @@ export async function POST(req: NextRequest) {
     }
 
     /**
-     * 8️⃣ Refresh cookie
+     * 9️⃣ Refresh cookie + return enriched response
      */
-    const res = NextResponse.json({ user });
+    const res = NextResponse.json({
+      user,
+      ...accountContext,
+    });
 
     res.cookies.set("app_session_id", session.id, {
       httpOnly: true,
