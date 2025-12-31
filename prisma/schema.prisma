@@ -94,6 +94,7 @@ enum SessionRevokedReason {
   LOGOUT
   OVERRIDDEN
   TIMEOUT
+  SUSPENDED
 }
 
 enum CorporateStatus {

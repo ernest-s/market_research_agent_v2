@@ -18,6 +18,8 @@ export default function AdminUsersPage() {
   const router = useRouter();
 
   const [users, setUsers] = useState<User[]>([]);
+  const [currentUserEmail, setCurrentUserEmail] = useState<string | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,6 +34,12 @@ export default function AdminUsersPage() {
   const [inviting, setInviting] = useState(false);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
+
+  // Suspend modal state
+  const [suspendUser, setSuspendUser] = useState<User | null>(null);
+  const [confirmEmail, setConfirmEmail] = useState("");
+  const [suspending, setSuspending] = useState(false);
+  const [suspendError, setSuspendError] = useState<string | null>(null);
 
   /**
    * Load users
@@ -53,8 +61,23 @@ export default function AdminUsersPage() {
       .finally(() => setLoading(false));
   };
 
+  /**
+   * Load current admin profile (for self-protection)
+   */
+  const loadCurrentUser = () => {
+    fetch("/api/user/profile")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.email) setCurrentUserEmail(data.email);
+      })
+      .catch(() => {
+        /* ignore */
+      });
+  };
+
   useEffect(() => {
     loadUsers();
+    loadCurrentUser();
   }, [router]);
 
   /**
@@ -66,10 +89,7 @@ export default function AdminUsersPage() {
 
     return users.filter((u) => {
       const name = `${u.firstName ?? ""} ${u.lastName ?? ""}`.toLowerCase();
-      return (
-        u.email.toLowerCase().includes(q) ||
-        name.includes(q)
-      );
+      return u.email.toLowerCase().includes(q) || name.includes(q);
     });
   }, [users, search]);
 
@@ -111,9 +131,7 @@ export default function AdminUsersPage() {
       const data = await res.json();
 
       if (!res.ok) {
-        setInviteError(
-          data?.error || "Failed to invite user"
-        );
+        setInviteError(data?.error || "Failed to invite user");
         return;
       }
 
@@ -128,6 +146,44 @@ export default function AdminUsersPage() {
       setInviteError("Failed to invite user");
     } finally {
       setInviting(false);
+    }
+  };
+
+  /**
+   * Suspend user
+   */
+  const handleSuspend = async () => {
+    if (!suspendUser) return;
+
+    setSuspendError(null);
+
+    if (confirmEmail.trim().toLowerCase() !== suspendUser.email.toLowerCase()) {
+      setSuspendError("Email does not match. Please type the exact email.");
+      return;
+    }
+
+    setSuspending(true);
+
+    try {
+      const res = await fetch(
+        `/api/admin/users/${suspendUser.id}/suspend`,
+        { method: "POST" }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setSuspendError(data?.error || "Failed to suspend user");
+        return;
+      }
+
+      setSuspendUser(null);
+      setConfirmEmail("");
+      loadUsers();
+    } catch {
+      setSuspendError("Failed to suspend user");
+    } finally {
+      setSuspending(false);
     }
   };
 
@@ -151,9 +207,7 @@ export default function AdminUsersPage() {
 
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">
-          Corporate Users
-        </h1>
+        <h1 className="text-2xl font-semibold">Corporate Users</h1>
 
         <button
           onClick={() => {
@@ -187,26 +241,50 @@ export default function AdminUsersPage() {
               <th className="text-left px-4 py-2">Name</th>
               <th className="text-left px-4 py-2">Role</th>
               <th className="text-left px-4 py-2">Status</th>
+              <th className="text-left px-4 py-2">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {pagedUsers.map((u) => (
-              <tr key={u.id} className="border-t">
-                <td className="px-4 py-2">{u.email}</td>
-                <td className="px-4 py-2">
-                  {u.firstName || u.lastName
-                    ? `${u.firstName ?? ""} ${u.lastName ?? ""}`
-                    : "—"}
-                </td>
-                <td className="px-4 py-2">{u.role}</td>
-                <td className="px-4 py-2">{u.status}</td>
-              </tr>
-            ))}
+            {pagedUsers.map((u) => {
+              const isSelf =
+                currentUserEmail &&
+                u.email.toLowerCase() ===
+                  currentUserEmail.toLowerCase();
+
+              return (
+                <tr key={u.id} className="border-t">
+                  <td className="px-4 py-2">{u.email}</td>
+                  <td className="px-4 py-2">
+                    {u.firstName || u.lastName
+                      ? `${u.firstName ?? ""} ${u.lastName ?? ""}`
+                      : "—"}
+                  </td>
+                  <td className="px-4 py-2">{u.role}</td>
+                  <td className="px-4 py-2">{u.status}</td>
+                  <td className="px-4 py-2">
+                    {u.status === "ACTIVE" && !isSelf ? (
+                      <button
+                        onClick={() => {
+                          setSuspendUser(u);
+                          setConfirmEmail("");
+                          setSuspendError(null);
+                        }}
+                        className="text-sm text-red-600 hover:underline"
+                      >
+                        Suspend
+                      </button>
+                    ) : (
+                      <span className="text-sm text-gray-400">—</span>
+                    )}
+                  </td>
+                </tr>
+              );
+            })}
 
             {pagedUsers.length === 0 && (
               <tr>
                 <td
-                  colSpan={4}
+                  colSpan={5}
                   className="px-4 py-6 text-center text-gray-500"
                 >
                   No users found
@@ -244,47 +322,35 @@ export default function AdminUsersPage() {
       {showInvite && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
           <div className="bg-white w-full max-w-md rounded-lg p-6 space-y-4">
-            <h2 className="text-lg font-semibold">
-              Invite user
-            </h2>
+            <h2 className="text-lg font-semibold">Invite user</h2>
 
             <input
               value={inviteEmail}
-              onChange={(e) =>
-                setInviteEmail(e.target.value)
-              }
+              onChange={(e) => setInviteEmail(e.target.value)}
               placeholder="Email"
               className="w-full border rounded-md px-3 py-2"
             />
 
             <input
               value={inviteFirstName}
-              onChange={(e) =>
-                setInviteFirstName(e.target.value)
-              }
+              onChange={(e) => setInviteFirstName(e.target.value)}
               placeholder="First name (optional)"
               className="w-full border rounded-md px-3 py-2"
             />
 
             <input
               value={inviteLastName}
-              onChange={(e) =>
-                setInviteLastName(e.target.value)
-              }
+              onChange={(e) => setInviteLastName(e.target.value)}
               placeholder="Last name (optional)"
               className="w-full border rounded-md px-3 py-2"
             />
 
             {inviteError && (
-              <p className="text-sm text-red-600">
-                {inviteError}
-              </p>
+              <p className="text-sm text-red-600">{inviteError}</p>
             )}
 
             {inviteSuccess && (
-              <p className="text-sm text-green-600">
-                {inviteSuccess}
-              </p>
+              <p className="text-sm text-green-600">{inviteSuccess}</p>
             )}
 
             <div className="flex justify-end gap-3 pt-2">
@@ -302,6 +368,52 @@ export default function AdminUsersPage() {
                 className="px-4 py-2 bg-black text-white rounded-md disabled:opacity-50"
               >
                 {inviting ? "Inviting…" : "Invite"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Suspend modal */}
+      {suspendUser && (
+        <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
+          <div className="bg-white w-full max-w-md rounded-lg p-6 space-y-4">
+            <h2 className="text-lg font-semibold text-red-600">
+              Suspend user
+            </h2>
+
+            <p className="text-sm text-gray-700">
+              To confirm suspension, type the user’s email:
+            </p>
+
+            <p className="text-sm font-medium">{suspendUser.email}</p>
+
+            <input
+              value={confirmEmail}
+              onChange={(e) => setConfirmEmail(e.target.value)}
+              placeholder="Type email to confirm"
+              className="w-full border rounded-md px-3 py-2"
+            />
+
+            {suspendError && (
+              <p className="text-sm text-red-600">{suspendError}</p>
+            )}
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={() => setSuspendUser(null)}
+                className="text-sm"
+                disabled={suspending}
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleSuspend}
+                disabled={suspending}
+                className="px-4 py-2 bg-red-600 text-white rounded-md disabled:opacity-50"
+              >
+                {suspending ? "Suspending…" : "Suspend"}
               </button>
             </div>
           </div>
