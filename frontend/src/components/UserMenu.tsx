@@ -7,6 +7,7 @@ type User = {
   email: string;
   firstName?: string | null;
   lastName?: string | null;
+  role?: "ADMIN" | "MEMBER"; // ✅ added (read-only, from profile API)
 };
 
 export default function UserMenu() {
@@ -73,6 +74,19 @@ export default function UserMenu() {
           >
             Account
           </button>
+
+          {/* ✅ Admin entry (corporate admins only) */}
+          {user.role === "ADMIN" && (
+            <button
+              onClick={() => {
+                setOpen(false);
+                router.push("/admin/users");
+              }}
+              className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 cursor-pointer"
+            >
+              Admin
+            </button>
+          )}
 
           <a
             href="/auth/logout"
