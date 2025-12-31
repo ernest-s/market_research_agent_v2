@@ -7,118 +7,77 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/* =========================
-   USER
-========================= */
-
 model User {
-  id        String   @id @default(uuid())
-  auth0Sub  String   @unique
-  email     String   @unique
-
-  firstName String?
-  lastName  String?
-
-  role      UserRole @default(MEMBER)
-
-  /* Individual company association (profile-level) */
-  companyId String?
-  company   Company? @relation(fields: [companyId], references: [id])
-
-  /* Corporate membership (explicit opt-in) */
+  id                 String            @id @default(uuid())
+  auth0Sub           String            @unique
+  email              String            @unique
+  firstName          String?
+  lastName           String?
+  role               UserRole          @default(MEMBER)
+  /// Individual company association (profile-level)
+  companyId          String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  /// Corporate membership (explicit opt-in)
   corporateAccountId String?
+  plan               UserPlan          @default(FREE)
+  status             UserStatus        @default(ACTIVE)
+  sessions           Session[]
+  studies            Study[]           @relation("UserStudies")
+  company            Company?          @relation(fields: [companyId], references: [id])
   corporateAccount   CorporateAccount? @relation(fields: [corporateAccountId], references: [id])
-
-  studies   Study[]  @relation("UserStudies")
-  sessions  Session[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 }
 
-/* =========================
-   SESSION
-========================= */
-
 model Session {
-  id            String   @id @default(uuid())
+  id            String                @id @default(uuid())
   userId        String
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  createdAt     DateTime @default(now())
-  lastSeenAt    DateTime @default(now())
+  createdAt     DateTime              @default(now())
+  lastSeenAt    DateTime              @default(now())
   expiresAt     DateTime
   revokedAt     DateTime?
-
   revokedReason SessionRevokedReason?
-
   userAgent     String?
   ipAddress     String?
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([expiresAt])
 }
 
-/* =========================
-   COMPANY (Neutral entity)
-========================= */
-
 model Company {
-  id        String   @id @default(uuid())
-  name      String   @unique
-  domain    String?
-
-  users     User[]
-  studies   Study[] @relation("CompanyStudies")
-
-  /* Optional corporate link */
+  id               String            @id @default(uuid())
+  name             String            @unique
+  domain           String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
   corporateAccount CorporateAccount?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  studies          Study[]           @relation("CompanyStudies")
+  users            User[]
 }
-
-/* =========================
-   CORPORATE ACCOUNT
-========================= */
 
 model CorporateAccount {
-  id            String   @id @default(uuid())
-  name          String
-  companyId     String   @unique
-  company       Company  @relation(fields: [companyId], references: [id])
-
-  billingEmail  String?
-  status        CorporateStatus @default(ACTIVE)
-
-  users         User[]
-
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String          @id @default(uuid())
+  name         String
+  companyId    String          @unique
+  billingEmail String?
+  status       CorporateStatus @default(ACTIVE)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  company      Company         @relation(fields: [companyId], references: [id])
+  users        User[]
 }
-
-/* =========================
-   STUDY
-========================= */
 
 model Study {
-  id           String      @id @default(uuid())
-  title        String
-  status       StudyStatus @default(DRAFT)
-
-  companyId    String
-  company      Company @relation("CompanyStudies", fields: [companyId], references: [id])
-
-  createdById  String
-  createdBy    User   @relation("UserStudies", fields: [createdById], references: [id])
-
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String      @id @default(uuid())
+  title       String
+  status      StudyStatus @default(DRAFT)
+  companyId   String
+  createdById String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  company     Company     @relation("CompanyStudies", fields: [companyId], references: [id])
+  createdBy   User        @relation("UserStudies", fields: [createdById], references: [id])
 }
-
-/* =========================
-   ENUMS
-========================= */
 
 enum UserRole {
   ADMIN
@@ -141,4 +100,15 @@ enum CorporateStatus {
   ACTIVE
   SUSPENDED
   TERMINATED
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum UserPlan {
+  FREE
+  CORPORATE
 }

@@ -8,11 +8,13 @@ import { getSessionExpiry } from "@/lib/session";
  * - session existence
  * - revocation
  * - sliding inactivity timeout (STRICT)
+ * - user + corporate account ACTIVE status
  *
  * IMPORTANT BEHAVIOR:
  * - If the user is inactive beyond SESSION_TIMEOUT_MINUTES,
  *   the FIRST request AFTER inactivity FAILS.
  * - Sessions are only refreshed if they were already valid.
+ * - Suspended users / accounts are immediately cut off.
  */
 export async function requireSession(sessionId: string | null) {
   if (!sessionId) {
@@ -21,7 +23,13 @@ export async function requireSession(sessionId: string | null) {
 
   const session = await prisma.session.findUnique({
     where: { id: sessionId },
-    include: { user: true },
+    include: {
+      user: {
+        include: {
+          corporateAccount: true,
+        },
+      },
+    },
   });
 
   if (!session) {
@@ -35,10 +43,45 @@ export async function requireSession(sessionId: string | null) {
     return null;
   }
 
+  /**
+   * 2️⃣ User / corporate status enforcement
+   */
+  const user = session.user;
+
+  // User must be ACTIVE
+  if (user.status !== "ACTIVE") {
+    await prisma.session.update({
+      where: { id: session.id },
+      data: {
+        revokedAt: new Date(),
+        revokedReason: "SUSPENDED",
+      },
+    });
+
+    return null;
+  }
+
+  // If corporate user, corporate account must also be ACTIVE
+  if (
+    user.corporateAccountId &&
+    user.corporateAccount &&
+    user.corporateAccount.status !== "ACTIVE"
+  ) {
+    await prisma.session.update({
+      where: { id: session.id },
+      data: {
+        revokedAt: new Date(),
+        revokedReason: "SUSPENDED",
+      },
+    });
+
+    return null;
+  }
+
   const now = new Date();
 
   /**
-   * 2️⃣ STRICT inactivity timeout check
+   * 3️⃣ STRICT inactivity timeout check
    *
    * A session expires if:
    *   now > lastSeenAt + SESSION_TIMEOUT_MINUTES
@@ -69,7 +112,7 @@ export async function requireSession(sessionId: string | null) {
   }
 
   /**
-   * 3️⃣ Sliding window refresh
+   * 4️⃣ Sliding window refresh
    *
    * ONLY happens if session was already valid.
    */

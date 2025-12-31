@@ -49,6 +49,7 @@ export async function GET(req: NextRequest) {
       companyName: user.company?.name ?? "",
       accountType: isCorporateUser ? "CORPORATE" : "INDIVIDUAL",
       isCompanyEditable: !isCorporateUser,
+      plan: user.plan, // ✅ added
     });
   } catch (err) {
     console.error("Get profile error:", err);
@@ -155,6 +156,7 @@ export async function PATCH(req: NextRequest) {
       companyName: updatedUser.company?.name ?? "",
       accountType: isCorporateUser ? "CORPORATE" : "INDIVIDUAL",
       isCompanyEditable: !isCorporateUser,
+      plan: updatedUser.plan, // ✅ added
     });
   } catch (err) {
     console.error("Update profile error:", err);

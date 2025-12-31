@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     const { sub, email, email_verified } = decoded;
 
     /**
-     * 2️⃣ Provision user (unchanged)
+     * 2️⃣ Provision user
      */
     let user = await prisma.user.findUnique({
       where: { auth0Sub: sub },
@@ -63,7 +63,30 @@ export async function POST(req: NextRequest) {
     }
 
     /**
-     * 3️⃣ Email verification (unchanged)
+     * 🚫 2.5️⃣ Account status enforcement (NEW)
+     * - User must be ACTIVE
+     * - Corporate account (if any) must be ACTIVE
+     */
+    if (user.status !== "ACTIVE") {
+      return NextResponse.json(
+        { error: "ACCOUNT_SUSPENDED" },
+        { status: 403 }
+      );
+    }
+
+    if (
+      user.corporateAccountId &&
+      user.corporateAccount &&
+      user.corporateAccount.status !== "ACTIVE"
+    ) {
+      return NextResponse.json(
+        { error: "ACCOUNT_SUSPENDED" },
+        { status: 403 }
+      );
+    }
+
+    /**
+     * 3️⃣ Email verification
      */
     const enforceVerification =
       process.env.NEXT_PUBLIC_ENFORCE_EMAIL_VERIFICATION === "true";

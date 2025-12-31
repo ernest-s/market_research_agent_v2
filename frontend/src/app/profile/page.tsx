@@ -12,6 +12,7 @@ type Profile = {
 type AccountMeta = {
   accountType: "INDIVIDUAL" | "CORPORATE";
   isCompanyEditable: boolean;
+  plan: "FREE" | "CORPORATE";
 };
 
 export default function ProfilePage() {
@@ -33,6 +34,7 @@ export default function ProfilePage() {
   const [accountMeta, setAccountMeta] = useState<AccountMeta>({
     accountType: "INDIVIDUAL",
     isCompanyEditable: true,
+    plan: "FREE",
   });
 
   /**
@@ -68,6 +70,7 @@ export default function ProfilePage() {
         setAccountMeta({
           accountType: data.accountType,
           isCompanyEditable: data.isCompanyEditable,
+          plan: data.plan ?? "FREE",
         });
       } catch (err) {
         console.error(err);
@@ -159,6 +162,27 @@ export default function ProfilePage() {
                 className="w-full border rounded-md px-3 py-2"
               />
             </div>
+          </div>
+
+          {/* PLAN (READ-ONLY) */}
+          <div>
+            <label className="block text-sm font-medium mb-1">
+              Plan
+            </label>
+            <input
+              value={
+                accountMeta.plan === "CORPORATE"
+                  ? "Corporate"
+                  : "Free"
+              }
+              disabled
+              className="w-full border rounded-md px-3 py-2 bg-gray-100 text-gray-700 cursor-not-allowed"
+            />
+            {accountMeta.plan === "FREE" && (
+              <p className="text-xs text-gray-500 mt-1">
+                Upgrade available
+              </p>
+            )}
           </div>
 
           {/* COMPANY */}

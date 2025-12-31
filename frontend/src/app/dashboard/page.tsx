@@ -41,6 +41,14 @@ export default function DashboardPage() {
       }
 
       if (res.status === 403) {
+        const data = await res.json();
+
+        if (data?.error === "ACCOUNT_SUSPENDED") {
+          router.replace("/account-suspended");
+          return;
+        }
+
+        // Default 403 = email verification
         router.replace("/verify-email");
         return;
       }
