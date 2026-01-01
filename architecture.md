@@ -15,6 +15,7 @@ The architecture is intentionally designed for:
 * Security (single-session enforcement)
 * Scalability (clear frontend / services separation)
 * Maintainability (single Prisma schema and migration history)
+* Auditability (admin-only, append-only audit logs)
 
 ---
 
@@ -31,10 +32,14 @@ root/
 │   ├── package.json
 │   ├── src/
 │   │   ├── app/            # Next.js App Router
+│   │   │   ├── api/        # Backend API routes
+│   │   │   ├── admin/      # Corporate admin UI
+│   │   │   └── auth/       # Auth bootstrap + password reset
 │   │   ├── components/
 │   │   └── lib/
 │   │       ├── prisma.ts
 │   │       ├── requireSession.ts
+│   │       ├── requireCorporateAdmin.ts
 │   │       └── auth helpers
 │   └── .env.local
 │
@@ -83,7 +88,7 @@ Key fields:
 1. User authenticates with Auth0
 2. `/api/auth/bootstrap`
 
-   * Provisions user
+   * Provisions or loads user
    * Enforces email verification
    * Creates or validates app session
 3. Session ID stored as HttpOnly cookie
@@ -125,6 +130,66 @@ This is enforced:
 * At UI level (dashboard bootstrap)
 
 ---
+## Corporate Accounts & Roles
+
+### Corporate Model
+
+The sysetm supports **corporate accounts** layered on top of individual users:
+* `Company` - represents a real-world organization
+* `CorporateAccount` - billing + administrative boundary
+* `User` - may optionally belong to a corporate account
+
+A user may exist independently or as part of a corporate account.
+
+### Roles
+
+| Role        | Capabilities                                        |
+| ----------- | ----------------------------------------------------|
+| ADMIN       | Manages users, suspend/reactivate, reset passwords  |
+| MEMBER.     | Normal product usage                                |
+
+Admins are **not special users** - they are standard users with elevated privileges.
+
+---
+## Corporate Admin APIs
+
+Corporate admin functionality is implemented via explicit API routes:
+* `POST /api/admin/users` - Invite new users
+* `POST /api/admin/users/:id/suspend`
+* `POST /api/admin/users/:id/reactivate`
+* `POST /api/admin/users/:id/reset-password`
+
+Rules enforced server-side:
+* Admins cannot suspend or reactivate themselves
+* Admins can act only withiin their corporate account
+* Only ACTIVE users can receive password reset emails
+* DELETED users are immutable
+---
+## Admin Audit Logging
+
+### Purpose
+
+All **admin actions** are recorded in an **append-only audit log** for:
+* Security reviews
+* Incident investigation
+* Compliance readiness
+
+### Characteristics
+
+* Append-only
+* Never updated
+* Never deleted (may be add cron job later to clear old logs)
+* Written synchronously with admin actions
+* No foreign key constraints (intentionally)
+
+### Logged Actions (Current)
+
+* User invited
+* User suspended
+* User reactivated
+* Password reset triggered
+
+---
 
 ## Middleware Strategy
 
@@ -135,7 +200,7 @@ This is enforced:
 * Never decodes JWTs
 * Never writes to the database
 
-APIs enforce auth/session explicitly inside route handlers.
+All authorization decisions occur inside API handlers.
 
 ---
 
@@ -143,14 +208,21 @@ APIs enforce auth/session explicitly inside route handlers.
 
 * **Single Prisma schema** at `/prisma/schema.prisma`
 * **Single migration history**
-* Prisma Client imported from workspace root
+* Prisma Client generated once per workspace
 
 All Prisma commands are run from the repository root:
 
 ```bash
-npx prisma migrate dev --schema=prisma/schema.prisma
 npx prisma generate --schema=prisma/schema.prisma
+npx prisma migrate dev --schema=prisma/schema.prisma
 ```
+
+### Migration Philosophy
+
+* Schema changes are incremental and explicit
+* High-risk changes are avoided in favor of additive models
+* Audit logs are designed as low-risk, append-only tables
+* SQL backups are maintained as a fallback safety mechanism
 
 ---
 
@@ -162,6 +234,7 @@ Key characteristics:
 * Client-side bootstrap + server-side enforcement
 * No JWT decoding in UI
 * No direct Auth0 SDK usage for session logic
+* Admin UI is role-gated via server APIs
 
 ---
 
@@ -172,17 +245,21 @@ The `services` workspace contains:
 * LangGraph-based agent systems
 * Cron jobs (e.g., session cleanup)
 
-Services share the same database and Prisma client, but are **deployment-independent** from the frontend.
+Services: 
+* Share the same database
+* Share Prisma Client
+* Are deployment-independent from the frontend
 
 ---
 
 ## Design Principles
 
 * One source of truth per concern
-* Explicit session enforcement
-* No magic auth state
 * Backend-first security
-* Workspace isolation with shared contracts
+* Explicit session enforcement
+* Append-only auditability
+* No hidden auth state
+* Clear separation of identity, access, and intelligence
 
 ---
 
@@ -192,7 +269,9 @@ This architecture deliberately separates:
 
 * Identity (Auth0)
 * Authorization (app sessions)
+* Administration – Corporate admin APIs + audit logs
 * UI (Next.js)
 * Intelligence (agents)
 
-The result is a secure, scalable, enterprise-ready SaaS foundation.
+The result is a secure, scalable, enterprise-ready SaaS foundation designed
+to support long-term evolution without architectural rewrites.
