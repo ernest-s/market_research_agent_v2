@@ -31,7 +31,6 @@ async function getManagementToken() {
 
 /**
  * GET /api/admin/users
- * List users in the same corporate account
  */
 export async function GET(req: NextRequest) {
   const sessionId = req.cookies.get("app_session_id")?.value ?? null;
@@ -92,7 +91,6 @@ export async function POST(req: NextRequest) {
     where: { email: normalizedEmail },
   });
 
-  // 🟢 Already in SAME corporate account
   if (
     existingUser &&
     existingUser.corporateAccountId === corporateAccountId
@@ -103,7 +101,6 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // 🔒 Any OTHER existing user
   if (existingUser) {
     return NextResponse.json(
       {
@@ -133,7 +130,7 @@ export async function POST(req: NextRequest) {
           email: normalizedEmail,
           email_verified: true,
           verify_email: false,
-          password: crypto.randomUUID(), // never exposed
+          password: crypto.randomUUID(),
           given_name: firstName,
           family_name: lastName,
         }),
@@ -149,15 +146,14 @@ export async function POST(req: NextRequest) {
     }
 
     const auth0User = await createUserRes.json();
-    const auth0UserId = auth0User.user_id;
 
     /**
      * 3️⃣ Create DB user
      */
-    await prisma.user.create({
+    const createdUser = await prisma.user.create({
       data: {
         email: normalizedEmail,
-        auth0Sub: auth0UserId,
+        auth0Sub: auth0User.user_id,
         firstName,
         lastName,
         role: "MEMBER",
@@ -194,6 +190,25 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    /**
+     * 🧾 5️⃣ Admin audit log
+     */
+    await prisma.adminAuditLog.create({
+      data: {
+        actorUserId: session.user.id,
+        actorEmail: session.user.email,
+        action: "USER_INVITED",
+        entityType: "User",
+        entityId: createdUser.id,
+        corporateAccountId,
+        metadata: {
+          invitedEmail: normalizedEmail,
+          firstName,
+          lastName,
+        },
+      },
+    });
 
     return NextResponse.json({
       success: true,

@@ -90,7 +90,25 @@ export async function POST(
     },
     data: {
       revokedAt: new Date(),
-      revokedReason: "SUSPENDED", // ✅ requires enum fix
+      revokedReason: "SUSPENDED",
+    },
+  });
+
+  /**
+   * 🧾 6️⃣ Admin audit log (SUCCESS ONLY)
+   */
+  await prisma.adminAuditLog.create({
+    data: {
+      actorUserId: session.user.id,
+      actorEmail: session.user.email,
+      action: "USER_SUSPENDED",
+      entityType: "User",
+      entityId: targetUserId,
+      corporateAccountId: session.user.corporateAccountId,
+      metadata: {
+        suspendedUserEmail: targetUser.email,
+        previousStatus: targetUser.status,
+      },
     },
   });
 

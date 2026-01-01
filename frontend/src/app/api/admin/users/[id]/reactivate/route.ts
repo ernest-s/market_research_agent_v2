@@ -90,5 +90,23 @@ export async function POST(
     },
   });
 
+  /**
+   * 🧾 5️⃣ Admin audit log (SUCCESS ONLY)
+   */
+  await prisma.adminAuditLog.create({
+    data: {
+      actorUserId: session.user.id,
+      actorEmail: session.user.email,
+      action: "USER_REACTIVATED",
+      entityType: "User",
+      entityId: targetUserId,
+      corporateAccountId: session.user.corporateAccountId,
+      metadata: {
+        reactivatedUserEmail: targetUser.email,
+        previousStatus: targetUser.status,
+      },
+    },
+  });
+
   return NextResponse.json({ success: true });
 }

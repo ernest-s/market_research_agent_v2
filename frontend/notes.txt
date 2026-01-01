@@ -41,5 +41,7 @@ Please refer src/app/api/user/profile/route.ts file for example usage
 # Run psql 
 docker exec -it qual-postgres psql -U postgres -d qual_db
 
+# For all corporate admin actions, add AdminAuditLog
+
 
 

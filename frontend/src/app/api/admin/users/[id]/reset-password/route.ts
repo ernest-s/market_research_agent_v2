@@ -27,6 +27,16 @@ export async function POST(
     const { id: targetUserId } = await context.params;
 
     /**
+     * 🚫 Admin cannot reset their own password here
+     */
+    if (targetUserId === session.user.id) {
+        return NextResponse.json(
+            { error: "Use Account page to reset your own password" },
+            { status: 400 }
+        );
+    }
+
+    /**
      * 3️⃣ Load target user
      */
     const targetUser = await prisma.user.findUnique({
@@ -65,7 +75,6 @@ export async function POST(
 
     /**
      * 4️⃣ Trigger Auth0 password reset email
-     * (same working flow as profile change password)
      */
     const resetRes = await fetch(
         `https://${process.env.AUTH0_ISSUER_BASE_URL!.replace(
@@ -94,16 +103,18 @@ export async function POST(
     }
 
     /**
-     * 5️⃣ Audit log
+     * 🧾 5️⃣ Admin audit log (append-only)
      */
-    await prisma.auditLog.create({
+    await prisma.adminAuditLog.create({
         data: {
             actorUserId: session.user.id,
-            action: "RESET_PASSWORD",
-            targetUserId,
-            corporateAccountId: session.user.corporateAccountId!,
+            actorEmail: session.user.email,
+            action: "PASSWORD_RESET_TRIGGERED",
+            entityType: "User",
+            entityId: targetUser.id,
+            corporateAccountId: session.user.corporateAccountId,
             metadata: {
-                email: targetUser.email,
+                targetUserEmail: targetUser.email,
             },
         },
     });

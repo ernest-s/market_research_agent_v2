@@ -1,3 +1,6 @@
+// =====================================================
+// PRISMA SETUP
+// =====================================================
 generator client {
   provider = "prisma-client-js"
 }
@@ -7,81 +10,24 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id                 String            @id @default(uuid())
-  auth0Sub           String            @unique
-  email              String            @unique
-  firstName          String?
-  lastName           String?
-  role               UserRole          @default(MEMBER)
-  /// Individual company association (profile-level)
-  companyId          String?
-  createdAt          DateTime          @default(now())
-  updatedAt          DateTime          @updatedAt
-  /// Corporate membership (explicit opt-in)
-  corporateAccountId String?
-  plan               UserPlan          @default(FREE)
-  status             UserStatus        @default(ACTIVE)
-  sessions           Session[]
-  studies            Study[]           @relation("UserStudies")
-  company            Company?          @relation(fields: [companyId], references: [id])
-  corporateAccount   CorporateAccount? @relation(fields: [corporateAccountId], references: [id])
-}
 
-model Session {
-  id            String                @id @default(uuid())
-  userId        String
-  createdAt     DateTime              @default(now())
-  lastSeenAt    DateTime              @default(now())
-  expiresAt     DateTime
-  revokedAt     DateTime?
-  revokedReason SessionRevokedReason?
-  userAgent     String?
-  ipAddress     String?
-  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([expiresAt])
-}
-
-model Company {
-  id               String            @id @default(uuid())
-  name             String            @unique
-  domain           String?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
-  corporateAccount CorporateAccount?
-  studies          Study[]           @relation("CompanyStudies")
-  users            User[]
-}
-
-model CorporateAccount {
-  id           String          @id @default(uuid())
-  name         String
-  companyId    String          @unique
-  billingEmail String?
-  status       CorporateStatus @default(ACTIVE)
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
-  company      Company         @relation(fields: [companyId], references: [id])
-  users        User[]
-}
-
-model Study {
-  id          String      @id @default(uuid())
-  title       String
-  status      StudyStatus @default(DRAFT)
-  companyId   String
-  createdById String
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  company     Company     @relation("CompanyStudies", fields: [companyId], references: [id])
-  createdBy   User        @relation("UserStudies", fields: [createdById], references: [id])
-}
-
+// =====================================================
+// ENUMS (GLOBAL)
+// =====================================================
 enum UserRole {
   ADMIN
   MEMBER
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+enum UserPlan {
+  FREE
+  CORPORATE
 }
 
 enum StudyStatus {
@@ -103,13 +49,136 @@ enum CorporateStatus {
   TERMINATED
 }
 
-enum UserStatus {
-  ACTIVE
-  SUSPENDED
-  DELETED
+
+// =====================================================
+// IDENTITY & AUTH
+// =====================================================
+model User {
+  id                 String            @id @default(uuid())
+  auth0Sub           String            @unique
+  email              String            @unique
+
+  firstName          String?
+  lastName           String?
+
+  role               UserRole          @default(MEMBER)
+  plan               UserPlan          @default(FREE)
+  status             UserStatus        @default(ACTIVE)
+
+  /// Individual company association (profile-level)
+  companyId          String?
+
+  /// Corporate membership (explicit opt-in)
+  corporateAccountId String?
+
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  sessions           Session[]
+  studies            Study[]           @relation("UserStudies")
+
+  company            Company?          @relation(fields: [companyId], references: [id])
+  corporateAccount   CorporateAccount? @relation(fields: [corporateAccountId], references: [id])
 }
 
-enum UserPlan {
-  FREE
-  CORPORATE
+
+model Session {
+  id            String                @id @default(uuid())
+  userId        String
+
+  createdAt     DateTime              @default(now())
+  lastSeenAt    DateTime              @default(now())
+  expiresAt     DateTime
+
+  revokedAt     DateTime?
+  revokedReason SessionRevokedReason?
+
+  userAgent     String?
+  ipAddress     String?
+
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+
+// =====================================================
+// CORPORATE / BILLING DOMAIN
+// =====================================================
+model Company {
+  id               String            @id @default(uuid())
+  name             String            @unique
+  domain           String?
+
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  corporateAccount CorporateAccount?
+  studies          Study[]           @relation("CompanyStudies")
+  users            User[]
+}
+
+
+model CorporateAccount {
+  id           String          @id @default(uuid())
+  name         String
+  companyId    String          @unique
+
+  billingEmail String?
+  status       CorporateStatus @default(ACTIVE)
+
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  company      Company         @relation(fields: [companyId], references: [id])
+  users        User[]
+}
+
+
+// =====================================================
+// PRODUCT DOMAIN (STUDIES)
+// =====================================================
+model Study {
+  id          String      @id @default(uuid())
+  title       String
+
+  status      StudyStatus @default(DRAFT)
+
+  companyId   String
+  createdById String
+
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  company     Company     @relation("CompanyStudies", fields: [companyId], references: [id])
+  createdBy   User        @relation("UserStudies", fields: [createdById], references: [id])
+}
+
+
+// =====================================================
+// ADMIN / AUDIT (APPEND-ONLY)
+// =====================================================
+/// Admin-only audit log
+/// Append-only, never updated or deleted
+model AdminAuditLog {
+  id                 String   @id @default(uuid())
+
+  /// Admin performing the action
+  actorUserId        String?
+  actorEmail         String?
+
+  /// e.g. INVITE_USER, SUSPEND_USER, REACTIVATE_USER
+  action             String
+
+  /// e.g. User, CorporateAccount
+  entityType         String
+  entityId           String?
+
+  corporateAccountId String?
+
+  /// Arbitrary structured context
+  metadata           Json?
+
+  createdAt          DateTime @default(now())
 }
