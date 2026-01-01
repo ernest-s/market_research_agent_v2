@@ -38,6 +38,7 @@ yarn-error.log*
 # 2. But do NOT ignore .env.example
 !.env.example
 !.env.local.example
+!.env.d.ts
 
 # vercel
 .vercel
