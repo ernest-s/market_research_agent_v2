@@ -85,13 +85,19 @@ export default function AdminUsersPage() {
    */
   const filteredUsers = useMemo(() => {
     const q = search.toLowerCase().trim();
-    if (!q) return users;
 
-    return users.filter((u) => {
-      const name = `${u.firstName ?? ""} ${u.lastName ?? ""}`.toLowerCase();
-      return u.email.toLowerCase().includes(q) || name.includes(q);
-    });
+    return users
+      .filter((u) => u.status !== "DELETED") // 🚫 hide deleted users
+      .filter((u) => {
+        if (!q) return true;
+        const name = `${u.firstName ?? ""} ${u.lastName ?? ""}`.toLowerCase();
+        return (
+          u.email.toLowerCase().includes(q) ||
+          name.includes(q)
+        );
+      });
   }, [users, search]);
+
 
   const totalPages = Math.max(
     1,
@@ -249,7 +255,7 @@ export default function AdminUsersPage() {
               const isSelf =
                 currentUserEmail &&
                 u.email.toLowerCase() ===
-                  currentUserEmail.toLowerCase();
+                currentUserEmail.toLowerCase();
 
               return (
                 <tr key={u.id} className="border-t">
@@ -262,7 +268,7 @@ export default function AdminUsersPage() {
                   <td className="px-4 py-2">{u.role}</td>
                   <td className="px-4 py-2">{u.status}</td>
                   <td className="px-4 py-2">
-                    {u.status === "ACTIVE" && !isSelf ? (
+                    {u.status === "ACTIVE" && !isSelf && (
                       <button
                         onClick={() => {
                           setSuspendUser(u);
@@ -273,9 +279,27 @@ export default function AdminUsersPage() {
                       >
                         Suspend
                       </button>
-                    ) : (
+                    )}
+
+                    {u.status === "SUSPENDED" && !isSelf && (
+                      <button
+                        onClick={async () => {
+                          await fetch(
+                            `/api/admin/users/${u.id}/reactivate`,
+                            { method: "POST" }
+                          );
+                          loadUsers();
+                        }}
+                        className="text-sm text-green-600 hover:underline"
+                      >
+                        Reactivate
+                      </button>
+                    )}
+
+                    {isSelf && (
                       <span className="text-sm text-gray-400">—</span>
                     )}
+
                   </td>
                 </tr>
               );
