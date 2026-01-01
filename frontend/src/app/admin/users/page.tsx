@@ -267,7 +267,35 @@ export default function AdminUsersPage() {
                   </td>
                   <td className="px-4 py-2">{u.role}</td>
                   <td className="px-4 py-2">{u.status}</td>
-                  <td className="px-4 py-2">
+                  <td className="px-4 py-2 space-x-3">
+                    {u.status === "ACTIVE" && u.role === "MEMBER" && (
+                      <button
+                        onClick={async () => {
+                          const ok = confirm(
+                            `Send password reset email to ${u.email}?`
+                          );
+                          if (!ok) return;
+
+                          const res = await fetch(
+                            `/api/admin/users/${u.id}/reset-password`,
+                            { method: "POST" }
+                          );
+
+                          const data = await res.json();
+
+                          if (!res.ok) {
+                            alert(data?.error || "Failed to reset password");
+                            return;
+                          }
+
+                          alert("Password reset email sent");
+                        }}
+                        className="text-sm text-blue-600 hover:underline"
+                      >
+                        Reset password
+                      </button>
+                    )}
+
                     {u.status === "ACTIVE" && !isSelf && (
                       <button
                         onClick={() => {
