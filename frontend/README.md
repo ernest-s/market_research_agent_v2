@@ -1,1 +1,0 @@
-Revoked sessions terminate on next interaction by design.

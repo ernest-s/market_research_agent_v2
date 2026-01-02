@@ -43,5 +43,8 @@ docker exec -it qual-postgres psql -U postgres -d qual_db
 
 # For all corporate admin actions, add AdminAuditLog
 
+# To create project structure run this command from the root folder
+tree -I "node_modules" > structure.txt
 
+# Revoked sessions terminate on next interaction by design.
 
