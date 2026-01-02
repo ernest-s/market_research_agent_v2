@@ -27,6 +27,21 @@
 │       │   └── backfill-users.js
 │       ├── src
 │       │   ├── app
+│       │   │   ├── (app)
+│       │   │   │   ├── dashboard
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── layout.tsx
+│       │   │   │   ├── org-admin
+│       │   │   │   │   └── users
+│       │   │   │   │       └── page.tsx
+│       │   │   │   └── profile
+│       │   │   │       └── page.tsx
+│       │   │   ├── (public)
+│       │   │   │   ├── login
+│       │   │   │   │   └── page.tsx
+│       │   │   │   ├── page.tsx
+│       │   │   │   └── verify-email
+│       │   │   │       └── page.tsx
 │       │   │   ├── account-suspended
 │       │   │   │   └── page.tsx
 │       │   │   ├── api
@@ -60,28 +75,17 @@
 │       │   │   │   │   └── route.ts
 │       │   │   │   └── logout
 │       │   │   │       └── route.ts
-│       │   │   ├── dashboard
-│       │   │   │   └── page.tsx
 │       │   │   ├── favicon.ico
 │       │   │   ├── globals.css
 │       │   │   ├── layout.tsx
-│       │   │   ├── login
-│       │   │   │   └── page.tsx
-│       │   │   ├── org-admin
-│       │   │   │   └── users
-│       │   │   │       └── page.tsx
-│       │   │   ├── page.tsx
-│       │   │   ├── profile
-│       │   │   │   └── page.tsx
-│       │   │   ├── providers.tsx
-│       │   │   └── verify-email
-│       │   │       └── page.tsx
+│       │   │   └── providers.tsx
 │       │   ├── components
 │       │   │   └── UserMenu.tsx
 │       │   ├── env.d.ts
 │       │   ├── lib
 │       │   │   ├── config.ts
 │       │   │   ├── prisma.ts
+│       │   │   ├── requireAppSession.ts
 │       │   │   ├── requireCorporateAdmin.ts
 │       │   │   ├── requireSession.ts
 │       │   │   └── session.ts
@@ -144,4 +148,4 @@
 │   └── tsconfig.json
 └── structure.txt
 
-56 directories, 89 files
+58 directories, 91 files

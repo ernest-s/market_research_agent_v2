@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import jwt from "jsonwebtoken";
+import { prisma } from "@/lib/prisma";
+import { getSessionExpiry } from "@/lib/session";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -7,12 +9,6 @@ export async function GET(req: NextRequest) {
   const error = searchParams.get("error");
   const code = searchParams.get("code");
 
-  /**
-   * 🔴 User clicked "Decline"
-   * OAuth spec: access_denied means authorization was refused,
-   * NOT that the user was logged out.
-   * We explicitly force a global logout to avoid consent loops.
-   */
   if (error === "access_denied") {
     const logoutUrl =
       `${process.env.AUTH0_ISSUER_BASE_URL}/v2/logout` +
@@ -24,18 +20,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.redirect(logoutUrl);
   }
 
-  /**
-   * No authorization code → go back to login
-   */
   if (!code) {
     return NextResponse.redirect(
       `${process.env.AUTH0_BASE_URL}/login`
     );
   }
 
-  /**
-   * Exchange authorization code for tokens
-   */
+  // Exchange code for tokens
   const tokenRes = await fetch(
     `${process.env.AUTH0_ISSUER_BASE_URL}/oauth/token`,
     {
@@ -61,17 +52,39 @@ export async function GET(req: NextRequest) {
   const tokenData = await tokenRes.json();
   const idToken = tokenData.id_token;
 
-  /**
-   * Decode ID token (verification not required here;
-   * trust boundary is Auth0 → backend APIs enforce auth)
-   */
   const decoded = jwt.decode(idToken) as {
+    sub?: string;
+    email?: string;
     email_verified?: boolean;
   } | null;
 
-  const isVerified = decoded?.email_verified === true;
+  if (!decoded?.sub) {
+    return NextResponse.redirect(
+      `${process.env.AUTH0_BASE_URL}/login`
+    );
+  }
 
-  const redirectPath = isVerified
+  // 1️⃣ Find or create user
+  const user = await prisma.user.upsert({
+    where: { auth0Sub: decoded.sub },
+    update: {},
+    create: {
+      auth0Sub: decoded.sub,
+      email: decoded.email!,
+      status: "ACTIVE",
+    },
+  });
+
+  // 2️⃣ ALWAYS create a NEW app session
+  const session = await prisma.session.create({
+    data: {
+      userId: user.id,
+      lastSeenAt: new Date(),
+      expiresAt: getSessionExpiry(),
+    },
+  });
+
+  const redirectPath = decoded.email_verified
     ? "/dashboard"
     : "/verify-email";
 
@@ -79,12 +92,15 @@ export async function GET(req: NextRequest) {
     `${process.env.AUTH0_BASE_URL}${redirectPath}`
   );
 
-  /**
-   * Store ID token for backend APIs
-   */
+  // 3️⃣ Set BOTH cookies
   res.cookies.set("auth0_id_token", idToken, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+  });
+
+  res.cookies.set("app_session_id", session.id, {
+    httpOnly: true,
     sameSite: "lax",
     path: "/",
   });
