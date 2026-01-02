@@ -46,7 +46,7 @@ export default function AdminUsersPage() {
    */
   const loadUsers = () => {
     setLoading(true);
-    fetch("/api/admin/users")
+    fetch("/api/org-admin/users")
       .then((res) => {
         if (res.status === 403) {
           router.replace("/dashboard");
@@ -124,7 +124,7 @@ export default function AdminUsersPage() {
     setInviting(true);
 
     try {
-      const res = await fetch("/api/admin/users", {
+      const res = await fetch("/api/org-admin/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -172,7 +172,7 @@ export default function AdminUsersPage() {
 
     try {
       const res = await fetch(
-        `/api/admin/users/${suspendUser.id}/suspend`,
+        `/api/org-admin/users/${suspendUser.id}/suspend`,
         { method: "POST" }
       );
 
@@ -277,7 +277,7 @@ export default function AdminUsersPage() {
                           if (!ok) return;
 
                           const res = await fetch(
-                            `/api/admin/users/${u.id}/reset-password`,
+                            `/api/org-admin/users/${u.id}/reset-password`,
                             { method: "POST" }
                           );
 
@@ -313,7 +313,7 @@ export default function AdminUsersPage() {
                       <button
                         onClick={async () => {
                           await fetch(
-                            `/api/admin/users/${u.id}/reactivate`,
+                            `/api/org-admin/users/${u.id}/reactivate`,
                             { method: "POST" }
                           );
                           loadUsers();

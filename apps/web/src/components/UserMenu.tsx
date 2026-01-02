@@ -80,7 +80,7 @@ export default function UserMenu() {
             <button
               onClick={() => {
                 setOpen(false);
-                router.push("/admin/users");
+                router.push("/org-admin/users");
               }}
               className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 cursor-pointer"
             >

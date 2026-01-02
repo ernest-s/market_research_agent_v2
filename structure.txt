@@ -9,7 +9,6 @@
 │       ├── eslint.config.mjs
 │       ├── next-env.d.ts
 │       ├── next.config.ts
-│       ├── notes.txt
 │       ├── package-lock.json
 │       ├── package.json
 │       ├── pnpm-lock.yaml
@@ -30,20 +29,7 @@
 │       │   ├── app
 │       │   │   ├── account-suspended
 │       │   │   │   └── page.tsx
-│       │   │   ├── admin
-│       │   │   │   └── users
-│       │   │   │       └── page.tsx
 │       │   │   ├── api
-│       │   │   │   ├── admin
-│       │   │   │   │   └── users
-│       │   │   │   │       ├── [id]
-│       │   │   │   │       │   ├── reactivate
-│       │   │   │   │       │   │   └── route.ts
-│       │   │   │   │       │   ├── reset-password
-│       │   │   │   │       │   │   └── route.ts
-│       │   │   │   │       │   └── suspend
-│       │   │   │   │       │       └── route.ts
-│       │   │   │   │       └── route.ts
 │       │   │   │   ├── auth
 │       │   │   │   │   ├── bootstrap
 │       │   │   │   │   │   └── route.ts
@@ -54,6 +40,16 @@
 │       │   │   │   │   └── session
 │       │   │   │   │       └── override
 │       │   │   │   │           └── route.ts
+│       │   │   │   ├── org-admin
+│       │   │   │   │   └── users
+│       │   │   │   │       ├── [id]
+│       │   │   │   │       │   ├── reactivate
+│       │   │   │   │       │   │   └── route.ts
+│       │   │   │   │       │   ├── reset-password
+│       │   │   │   │       │   │   └── route.ts
+│       │   │   │   │       │   └── suspend
+│       │   │   │   │       │       └── route.ts
+│       │   │   │   │       └── route.ts
 │       │   │   │   └── user
 │       │   │   │       └── profile
 │       │   │   │           └── route.ts
@@ -71,6 +67,9 @@
 │       │   │   ├── layout.tsx
 │       │   │   ├── login
 │       │   │   │   └── page.tsx
+│       │   │   ├── org-admin
+│       │   │   │   └── users
+│       │   │   │       └── page.tsx
 │       │   │   ├── page.tsx
 │       │   │   ├── profile
 │       │   │   │   └── page.tsx
@@ -91,7 +90,8 @@
 ├── docs
 │   ├── architecture.md
 │   ├── production_deployment.md
-│   └── services_notes.txt
+│   ├── services_notes.txt
+│   └── web_notes.txt
 ├── package-lock.json
 ├── package.json
 ├── prisma

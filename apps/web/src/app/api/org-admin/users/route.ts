@@ -30,7 +30,7 @@ async function getManagementToken() {
 }
 
 /**
- * GET /api/admin/users
+ * GET /api/org-admin/users
  */
 export async function GET(req: NextRequest) {
   const sessionId = req.cookies.get("app_session_id")?.value ?? null;
@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * POST /api/admin/users
+ * POST /api/org-admin/users
  * Invite a NEW MEMBER user only
  */
 export async function POST(req: NextRequest) {
