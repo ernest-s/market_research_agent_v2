@@ -1,13 +1,12 @@
-import { ReactNode } from "react"
-import { requireAppSession } from "@/lib/requireAppSession"
-import { AppShell } from "@/components/layout/AppShell"
+import { ReactNode } from "react";
+import { requireAppSession } from "@/lib/requireAppSession";
+import { AppShell } from "@/components/layout/AppShell";
 
 export default async function AppLayout({
     children,
 }: {
-    children: ReactNode
+    children: ReactNode;
 }) {
-    await requireAppSession()
-
-    return <AppShell>{children}</AppShell>
+    const session = await requireAppSession();
+    return <AppShell session={session}>{children}</AppShell>;
 }

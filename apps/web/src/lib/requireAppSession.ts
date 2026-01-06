@@ -11,14 +11,24 @@ export async function requireAppSession() {
     const sessionId =
         cookieStore.get(APP_SESSION_COOKIE)?.value ?? null;
 
-    // Validate session against DB + business rules
-    const session = await requireSession(sessionId);
+    const result = await requireSession(sessionId);
 
-    // No valid app session → force login
-    if (!session) {
+    /**
+     * ❌ No valid session → force login
+     */
+    if (result.kind === "INVALID") {
         redirect("/login");
     }
 
-    // Valid session → allow render
-    return session;
+    /**
+     * ⛔ Authenticated but suspended → account suspended page
+     */
+    if (result.kind === "SUSPENDED") {
+        redirect("/account-suspended");
+    }
+
+    /**
+     * ✅ Valid session → allow render
+     */
+    return result.session;
 }

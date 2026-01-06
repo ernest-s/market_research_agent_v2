@@ -10,23 +10,33 @@ import { requireSession } from "@/lib/requireSession";
  *
  * Returns:
  * - session with user + corporateAccount loaded
+ * - null if not authorized
+ *
+ * IMPORTANT:
+ * - Backward compatible with existing callers
+ * - Handles RequireSessionResult correctly
  */
 export async function requireCorporateAdmin(sessionId: string | null) {
-  const session = await requireSession(sessionId);
+  const result = await requireSession(sessionId);
 
-  if (!session) {
+  // ❌ No valid session
+  if (result.kind !== "VALID") {
     return null;
   }
 
+  const session = result.session;
   const user = session.user;
 
+  // ❌ Not a corporate user
   if (!user.corporateAccountId) {
     return null;
   }
 
+  // ❌ Not an admin
   if (user.role !== "ADMIN") {
     return null;
   }
 
+  // ✅ Authorized corporate admin
   return session;
 }

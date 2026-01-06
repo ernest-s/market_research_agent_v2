@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireSession } from "@/lib/requireSession";
 
+const APP_SESSION_COOKIE = "app_session_id";
+
 /**
  * GET /api/user/profile
  * ❌ MUST NOT enforce email verification
@@ -12,15 +14,27 @@ export async function GET(req: NextRequest) {
     /**
      * 1️⃣ Require valid app session
      */
-    const sessionId = req.cookies.get("app_session_id")?.value ?? null;
-    const session = await requireSession(sessionId);
+    const sessionId =
+      req.cookies.get(APP_SESSION_COOKIE)?.value ?? null;
 
-    if (!session) {
+    const result = await requireSession(sessionId);
+
+    if (result.kind === "INVALID") {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
     }
+
+    if (result.kind === "SUSPENDED") {
+      return NextResponse.json(
+        { error: "ACCOUNT_SUSPENDED" },
+        { status: 403 }
+      );
+    }
+
+    // ✅ VALID session
+    const session = result.session;
 
     /**
      * 2️⃣ Load user profile with corporate context
@@ -50,7 +64,7 @@ export async function GET(req: NextRequest) {
       accountType: isCorporateUser ? "CORPORATE" : "INDIVIDUAL",
       isCompanyEditable: !isCorporateUser,
       plan: user.plan,
-      role: user.role, // ✅ added (read-only exposure)
+      role: user.role, // read-only exposure
     });
   } catch (err) {
     console.error("Get profile error:", err);
@@ -71,15 +85,27 @@ export async function PATCH(req: NextRequest) {
     /**
      * 1️⃣ Require valid app session
      */
-    const sessionId = req.cookies.get("app_session_id")?.value ?? null;
-    const session = await requireSession(sessionId);
+    const sessionId =
+      req.cookies.get(APP_SESSION_COOKIE)?.value ?? null;
 
-    if (!session) {
+    const result = await requireSession(sessionId);
+
+    if (result.kind === "INVALID") {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
       );
     }
+
+    if (result.kind === "SUSPENDED") {
+      return NextResponse.json(
+        { error: "ACCOUNT_SUSPENDED" },
+        { status: 403 }
+      );
+    }
+
+    // ✅ VALID session
+    const session = result.session;
 
     /**
      * 2️⃣ Load user with corporate context
@@ -158,7 +184,7 @@ export async function PATCH(req: NextRequest) {
       accountType: isCorporateUser ? "CORPORATE" : "INDIVIDUAL",
       isCompanyEditable: !isCorporateUser,
       plan: updatedUser.plan,
-      role: updatedUser.role, // ✅ added (read-only exposure)
+      role: updatedUser.role,
     });
   } catch (err) {
     console.error("Update profile error:", err);

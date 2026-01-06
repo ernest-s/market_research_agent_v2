@@ -7,30 +7,51 @@ type User = {
   email: string;
   firstName?: string | null;
   lastName?: string | null;
-  role?: "ADMIN" | "MEMBER"; // ✅ added (read-only, from profile API)
+  role?: "ADMIN" | "MEMBER";
 };
 
-export default function UserMenu() {
-  const [user, setUser] = useState<User | null>(null);
+type UserMenuProps = {
+  /**
+   * Optional user passed from layout / TopBar.
+   * If provided, we skip fetching.
+   */
+  user?: User | null;
+};
+
+export default function UserMenu({ user: userProp }: UserMenuProps) {
+  const [user, setUser] = useState<User | null>(userProp ?? null);
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
-  // Fetch current user from backend
+  /**
+   * Fetch current user ONLY if not provided via props
+   */
   useEffect(() => {
+    if (userProp) {
+      setUser(userProp);
+      return;
+    }
+
     fetch("/api/user/profile")
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => setUser(data))
       .catch(() => setUser(null));
-  }, []);
+  }, [userProp]);
 
-  // Close dropdown on outside click
+  /**
+   * Close dropdown on outside click
+   */
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      if (
+        menuRef.current &&
+        !menuRef.current.contains(event.target as Node)
+      ) {
         setOpen(false);
       }
     }
+
     document.addEventListener("mousedown", handleClickOutside);
     return () =>
       document.removeEventListener("mousedown", handleClickOutside);
@@ -75,7 +96,7 @@ export default function UserMenu() {
             Account
           </button>
 
-          {/* ✅ Admin entry (corporate admins only) */}
+          {/* Admin-only entry */}
           {user.role === "ADMIN" && (
             <button
               onClick={() => {

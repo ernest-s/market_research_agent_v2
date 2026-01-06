@@ -3,7 +3,7 @@
 import Image from "next/image";
 import UserMenu from "@/components/UserMenu";
 
-export function TopBar() {
+export function TopBar({ session }: { session: any }) {
     return (
         <header
             style={{
@@ -16,19 +16,15 @@ export function TopBar() {
                 backgroundColor: "#ffffff",
             }}
         >
-            {/* Brand */}
-            <div style={{ display: "flex", alignItems: "center" }}>
-                <Image
-                    src="/brand/logo.svg"
-                    alt="InsightFlow"
-                    width={140}
-                    height={32}
-                    priority
-                />
-            </div>
+            <Image
+                src="/brand/logo.svg"
+                alt="InsightFlow"
+                width={140}
+                height={32}
+                priority
+            />
 
-            {/* User menu */}
-            <UserMenu />
+            <UserMenu user={session.user} />
         </header>
     );
 }

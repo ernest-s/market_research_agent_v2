@@ -1,8 +1,13 @@
-import { ReactNode } from "react"
-import { TopBar } from "./TopBar"
-import { Sidebar } from "./Sidebar"
+import { ReactNode } from "react";
+import { TopBar } from "./TopBar";
+import { Sidebar } from "./Sidebar";
 
-export function AppShell({ children }: { children: ReactNode }) {
+export type AppShellProps = {
+    children: ReactNode;
+    session: any;
+};
+
+export function AppShell({ children, session }: AppShellProps) {
     return (
         <div
             style={{
@@ -12,10 +17,8 @@ export function AppShell({ children }: { children: ReactNode }) {
                 backgroundColor: "#f9fafb",
             }}
         >
-            {/* Top navigation */}
-            <TopBar />
+            <TopBar session={session} />
 
-            {/* Body */}
             <div
                 style={{
                     flex: 1,
@@ -23,10 +26,8 @@ export function AppShell({ children }: { children: ReactNode }) {
                     overflow: "hidden",
                 }}
             >
-                {/* Sidebar */}
                 <Sidebar />
 
-                {/* Main content */}
                 <main
                     style={{
                         flex: 1,
@@ -49,5 +50,5 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </main>
             </div>
         </div>
-    )
+    );
 }

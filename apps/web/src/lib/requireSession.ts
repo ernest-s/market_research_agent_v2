@@ -16,9 +16,21 @@ import { getSessionExpiry } from "@/lib/session";
  * - Sessions are only refreshed if they were already valid.
  * - Suspended users / accounts are immediately cut off.
  */
-export async function requireSession(sessionId: string | null) {
+
+/**
+ * Result type that PRESERVES why a session failed.
+ * This is critical for correct routing behavior.
+ */
+export type RequireSessionResult =
+  | { kind: "VALID"; session: any }
+  | { kind: "SUSPENDED" }
+  | { kind: "INVALID" };
+
+export async function requireSession(
+  sessionId: string | null
+): Promise<RequireSessionResult> {
   if (!sessionId) {
-    return null;
+    return { kind: "INVALID" };
   }
 
   const session = await prisma.session.findUnique({
@@ -33,14 +45,14 @@ export async function requireSession(sessionId: string | null) {
   });
 
   if (!session) {
-    return null;
+    return { kind: "INVALID" };
   }
 
   /**
    * 1️⃣ Revoked session → immediately reject
    */
   if (session.revokedAt) {
-    return null;
+    return { kind: "INVALID" };
   }
 
   /**
@@ -58,7 +70,7 @@ export async function requireSession(sessionId: string | null) {
       },
     });
 
-    return null;
+    return { kind: "SUSPENDED" };
   }
 
   // If corporate user, corporate account must also be ACTIVE
@@ -75,18 +87,13 @@ export async function requireSession(sessionId: string | null) {
       },
     });
 
-    return null;
+    return { kind: "SUSPENDED" };
   }
 
   const now = new Date();
 
   /**
    * 3️⃣ STRICT inactivity timeout check
-   *
-   * A session expires if:
-   *   now > lastSeenAt + SESSION_TIMEOUT_MINUTES
-   *
-   * The FIRST request after inactivity MUST FAIL.
    */
   if (session.lastSeenAt) {
     const timeoutMinutes =
@@ -94,7 +101,7 @@ export async function requireSession(sessionId: string | null) {
 
     const inactivityDeadline = new Date(
       session.lastSeenAt.getTime() +
-        timeoutMinutes * 60 * 1000
+      timeoutMinutes * 60 * 1000
     );
 
     if (now > inactivityDeadline) {
@@ -107,7 +114,7 @@ export async function requireSession(sessionId: string | null) {
         },
       });
 
-      return null;
+      return { kind: "INVALID" };
     }
   }
 
@@ -124,5 +131,5 @@ export async function requireSession(sessionId: string | null) {
     },
   });
 
-  return session;
+  return { kind: "VALID", session };
 }
