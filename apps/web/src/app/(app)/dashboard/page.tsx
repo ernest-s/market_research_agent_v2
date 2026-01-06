@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import UserMenu from "@/components/UserMenu";
 
 type User = {
   email: string;
@@ -121,7 +120,7 @@ export default function DashboardPage() {
    */
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-[300px] flex items-center justify-center text-gray-600">
         Loading...
       </div>
     );
@@ -132,7 +131,7 @@ export default function DashboardPage() {
    */
   if (sessionConflict) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-[400px] flex items-center justify-center">
         <div className="bg-white max-w-md w-full p-6 rounded-lg shadow border">
           <h2 className="text-xl font-semibold mb-3">
             You’re already logged in elsewhere
@@ -161,14 +160,14 @@ export default function DashboardPage() {
           <div className="mt-6 flex justify-end gap-3">
             <button
               onClick={handleCancel}
-              className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-100 cursor-pointer"
+              className="px-4 py-2 border rounded-md text-gray-700 hover:bg-gray-100"
             >
               Cancel
             </button>
 
             <button
               onClick={handleProceedHere}
-              className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800 cursor-pointer"
+              className="px-4 py-2 bg-black text-white rounded-md hover:bg-gray-800"
             >
               Proceed here
             </button>
@@ -186,25 +185,17 @@ export default function DashboardPage() {
   }
 
   /**
-   * 5️⃣ Dashboard UI
+   * 5️⃣ Dashboard UI (CONTENT ONLY)
    */
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="h-16 bg-white border-b flex items-center justify-between px-6">
-        <h1 className="text-xl font-semibold">
-          Qualitative Research Platform
-        </h1>
-        <UserMenu />
-      </header>
+    <>
+      <h1 className="text-2xl font-bold mb-2">
+        Welcome{user.firstName ? `, ${user.firstName}` : ""}
+      </h1>
 
-      <main className="p-8">
-        <h2 className="text-2xl font-bold mb-2">
-          Welcome{user.firstName ? `, ${user.firstName}` : ""}
-        </h2>
-        <p className="text-gray-600">
-          This is your dashboard. Your studies will appear here.
-        </p>
-      </main>
-    </div>
+      <p className="text-gray-600">
+        This is your dashboard. Your studies will appear here.
+      </p>
+    </>
   );
 }

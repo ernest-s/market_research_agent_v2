@@ -1,24 +1,13 @@
-import { ReactNode } from "react";
-import { requireAppSession } from "@/lib/requireAppSession";
+import { ReactNode } from "react"
+import { requireAppSession } from "@/lib/requireAppSession"
+import { AppShell } from "@/components/layout/AppShell"
 
 export default async function AppLayout({
     children,
 }: {
-    children: ReactNode;
+    children: ReactNode
 }) {
-    // Enforce authentication for all app routes
-    // Will redirect to /login if session is invalid or missing
-    await requireAppSession();
+    await requireAppSession()
 
-    return (
-        <div
-            style={{
-                minHeight: "100vh",
-                display: "flex",
-                flexDirection: "column",
-            }}
-        >
-            {children}
-        </div>
-    );
+    return <AppShell>{children}</AppShell>
 }
