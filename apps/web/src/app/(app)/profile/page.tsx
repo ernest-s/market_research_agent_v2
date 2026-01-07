@@ -46,7 +46,8 @@ export default function ProfilePage() {
         const res = await fetch("/api/user/profile");
 
         if (res.status === 401) {
-          router.replace("/login");
+          // ⛔ Session expired → force full logout (prevents silent login)
+          window.location.href = "/auth/logout";
           return;
         }
 
@@ -196,11 +197,10 @@ export default function ProfilePage() {
               onChange={(e) =>
                 setProfile({ ...profile, companyName: e.target.value })
               }
-              className={`w-full border rounded-md px-3 py-2 ${
-                !accountMeta.isCompanyEditable
+              className={`w-full border rounded-md px-3 py-2 ${!accountMeta.isCompanyEditable
                   ? "bg-gray-100 text-gray-600 cursor-not-allowed"
                   : ""
-              }`}
+                }`}
             />
             {!accountMeta.isCompanyEditable && (
               <p className="text-xs text-gray-500 mt-1">

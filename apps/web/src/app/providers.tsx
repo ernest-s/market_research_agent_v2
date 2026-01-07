@@ -1,29 +1,24 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
 /**
  * Routes that do NOT require session revalidation.
- * These are public or unauthenticated pages.
  */
 const PUBLIC_ROUTE_PREFIXES = [
   "/",                // landing / marketing
   "/login",
   "/verify-email",
   "/account-suspended",
-  "/auth",             // /auth/login, /auth/logout, /auth/change-password, etc.
+  "/auth",             // /auth/login, /auth/logout, etc.
 ];
 
-/**
- * Returns true if the current pathname is public.
- */
 function isPublicRoute(pathname: string): boolean {
-  // Exact "/" match
   if (pathname === "/") return true;
 
-  return PUBLIC_ROUTE_PREFIXES.some((prefix) =>
-    prefix !== "/" && pathname.startsWith(prefix)
+  return PUBLIC_ROUTE_PREFIXES.some(
+    (prefix) => prefix !== "/" && pathname.startsWith(prefix)
   );
 }
 
@@ -36,6 +31,7 @@ export function Providers({
   const router = useRouter();
 
   const lastPathRef = useRef<string | null>(null);
+  const [isCheckingSession, setIsCheckingSession] = useState(false);
 
   useEffect(() => {
     // Initial mount
@@ -51,10 +47,14 @@ export function Providers({
 
     lastPathRef.current = pathname;
 
-    // ✅ Skip revalidation for public routes
+    // Public routes render immediately
     if (isPublicRoute(pathname)) {
+      setIsCheckingSession(false);
       return;
     }
+
+    // 🔒 Protected route → block render until revalidated
+    setIsCheckingSession(true);
 
     const revalidateSession = async () => {
       try {
@@ -64,7 +64,7 @@ export function Providers({
         });
 
         if (res.status === 401) {
-          router.replace("/login");
+          window.location.href = "/auth/logout";
           return;
         }
 
@@ -73,15 +73,23 @@ export function Providers({
           return;
         }
 
-        // 200 → session valid, sliding window already refreshed
+        // ✅ Session valid → allow render
+        setIsCheckingSession(false);
       } catch (err) {
         console.error("Session revalidation failed", err);
-        router.replace("/login");
+        window.location.href = "/auth/logout";
       }
     };
 
     revalidateSession();
   }, [pathname, router]);
+
+  /**
+   * ⛔ Block rendering protected pages during session check
+   */
+  if (isCheckingSession) {
+    return null; // or a global spinner if you prefer
+  }
 
   return <>{children}</>;
 }

@@ -5,7 +5,6 @@ import { requireSession } from "@/lib/requireSession";
 const APP_SESSION_COOKIE = "app_session_id";
 
 export async function requireAppSession() {
-    // Read cookies from the incoming request (server-side)
     const cookieStore = await cookies();
 
     const sessionId =
@@ -14,14 +13,15 @@ export async function requireAppSession() {
     const result = await requireSession(sessionId);
 
     /**
-     * ❌ No valid session → force login
+     * ❌ No valid session (expired / missing / revoked)
+     * → Force full logout to clear IdP session
      */
     if (result.kind === "INVALID") {
-        redirect("/login");
+        redirect("/auth/logout");
     }
 
     /**
-     * ⛔ Authenticated but suspended → account suspended page
+     * ⛔ Authenticated but suspended
      */
     if (result.kind === "SUSPENDED") {
         redirect("/account-suspended");
