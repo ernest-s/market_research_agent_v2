@@ -3,6 +3,30 @@
 import { useEffect, useRef } from "react";
 import { usePathname, useRouter } from "next/navigation";
 
+/**
+ * Routes that do NOT require session revalidation.
+ * These are public or unauthenticated pages.
+ */
+const PUBLIC_ROUTE_PREFIXES = [
+  "/",                // landing / marketing
+  "/login",
+  "/verify-email",
+  "/account-suspended",
+  "/auth",             // /auth/login, /auth/logout, /auth/change-password, etc.
+];
+
+/**
+ * Returns true if the current pathname is public.
+ */
+function isPublicRoute(pathname: string): boolean {
+  // Exact "/" match
+  if (pathname === "/") return true;
+
+  return PUBLIC_ROUTE_PREFIXES.some((prefix) =>
+    prefix !== "/" && pathname.startsWith(prefix)
+  );
+}
+
 export function Providers({
   children,
 }: {
@@ -11,31 +35,26 @@ export function Providers({
   const pathname = usePathname();
   const router = useRouter();
 
-  // Prevent double calls on initial mount
   const lastPathRef = useRef<string | null>(null);
 
   useEffect(() => {
-    // Skip first render
-    console.log(
-      "[Providers] useEffect fired",
-      "prev =", lastPathRef.current,
-      "current =", pathname
-    );
-
+    // Initial mount
     if (lastPathRef.current === null) {
       lastPathRef.current = pathname;
-      console.log("[Providers] initial mount, skipping");
       return;
     }
 
-    // Skip if pathname didn't actually change
+    // No actual navigation
     if (lastPathRef.current === pathname) {
-      console.log("[Providers] same pathname, skipping");
       return;
     }
 
     lastPathRef.current = pathname;
-    console.log("[Providers] pathname changed, calling revalidate");
+
+    // ✅ Skip revalidation for public routes
+    if (isPublicRoute(pathname)) {
+      return;
+    }
 
     const revalidateSession = async () => {
       try {
@@ -43,8 +62,6 @@ export function Providers({
           method: "POST",
           credentials: "include",
         });
-
-        console.log("[Providers] revalidate response status =", res.status);
 
         if (res.status === 401) {
           router.replace("/login");
@@ -56,7 +73,7 @@ export function Providers({
           return;
         }
 
-        // 200 → session valid, nothing else to do
+        // 200 → session valid, sliding window already refreshed
       } catch (err) {
         console.error("Session revalidation failed", err);
         router.replace("/login");

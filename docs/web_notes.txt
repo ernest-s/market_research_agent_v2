@@ -48,3 +48,5 @@ tree -I "node_modules" > structure.txt
 
 # Revoked sessions terminate on next interaction by design.
 
+# Whenever a new page is added to app/(public) add it to the list of PUBLIC_ROUTE_PREFIXES
+# in the file src/app/providers.tsx
