@@ -12,6 +12,10 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
     {
+        label: "Dashboard",
+        href: "/dashboard",
+    },
+    {
         label: "Quantitative Research",
         href: "/quantitative",
     },
@@ -56,19 +60,7 @@ export function Sidebar() {
             }}
         >
             <nav style={{ padding: "0 12px" }}>
-                <div
-                    style={{
-                        fontSize: 12,
-                        fontWeight: 600,
-                        color: "#6b7280",
-                        marginBottom: 12,
-                        paddingLeft: 8,
-                    }}
-                >
-                    MAIN
-                </div>
-
-                {NAV_ITEMS.map((item) => {
+                {NAV_ITEMS.map((item, index) => {
                     const isActive =
                         item.href && pathname.startsWith(item.href);
 
@@ -77,7 +69,10 @@ export function Sidebar() {
                     return (
                         <div
                             key={item.label}
-                            style={{ marginBottom: 6 }}
+                            style={{
+                                marginBottom: 6,
+                                marginTop: index === 1 ? 8 : 0, // subtle spacing after Dashboard
+                            }}
                             onMouseEnter={() => setHoveredItem(item.label)}
                             onMouseLeave={() => setHoveredItem(null)}
                         >
