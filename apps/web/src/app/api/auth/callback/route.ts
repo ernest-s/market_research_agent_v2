@@ -26,7 +26,9 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  // Exchange code for tokens
+  /**
+   * 🔐 Exchange code for tokens
+   */
   const tokenRes = await fetch(
     `${process.env.AUTH0_ISSUER_BASE_URL}/oauth/token`,
     {
@@ -58,24 +60,52 @@ export async function GET(req: NextRequest) {
     email_verified?: boolean;
   } | null;
 
-  if (!decoded?.sub) {
+  if (!decoded?.sub || !decoded.email) {
     return NextResponse.redirect(
       `${process.env.AUTH0_BASE_URL}/login`
     );
   }
 
-  // 1️⃣ Find or create user
-  const user = await prisma.user.upsert({
+  /**
+   * 1️⃣ Resolve user safely (Option A)
+   *
+   * Priority:
+   * 1. auth0Sub match
+   * 2. email match → attach new auth0Sub
+   * 3. create new user
+   */
+  let user = await prisma.user.findUnique({
     where: { auth0Sub: decoded.sub },
-    update: {},
-    create: {
-      auth0Sub: decoded.sub,
-      email: decoded.email!,
-      status: "ACTIVE",
-    },
   });
 
-  // 2️⃣ ALWAYS create a NEW app session
+  if (!user) {
+    const existingByEmail = await prisma.user.findUnique({
+      where: { email: decoded.email },
+    });
+
+    if (existingByEmail) {
+      // Attach new identity (overwrite auth0Sub)
+      user = await prisma.user.update({
+        where: { id: existingByEmail.id },
+        data: {
+          auth0Sub: decoded.sub,
+        },
+      });
+    } else {
+      // Create brand-new user
+      user = await prisma.user.create({
+        data: {
+          auth0Sub: decoded.sub,
+          email: decoded.email,
+          status: "ACTIVE",
+        },
+      });
+    }
+  }
+
+  /**
+   * 2️⃣ ALWAYS create a NEW app session
+   */
   const session = await prisma.session.create({
     data: {
       userId: user.id,
@@ -92,7 +122,9 @@ export async function GET(req: NextRequest) {
     `${process.env.AUTH0_BASE_URL}${redirectPath}`
   );
 
-  // 3️⃣ Set BOTH cookies
+  /**
+   * 3️⃣ Set BOTH cookies
+   */
   res.cookies.set("auth0_id_token", idToken, {
     httpOnly: true,
     sameSite: "lax",
