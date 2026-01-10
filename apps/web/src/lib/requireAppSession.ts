@@ -17,8 +17,9 @@ export async function requireAppSession() {
      * → Force full logout to clear IdP session
      */
     if (result.kind === "INVALID") {
-        redirect("/auth/logout");
+        redirect("/login?reason=timeout");
     }
+
 
     /**
      * ⛔ Authenticated but suspended

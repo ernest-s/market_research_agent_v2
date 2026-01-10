@@ -1,17 +1,17 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 
 /**
  * Routes that do NOT require session revalidation.
  */
 const PUBLIC_ROUTE_PREFIXES = [
-  "/",                // landing / marketing
+  "/", // landing / marketing
   "/login",
   "/verify-email",
   "/account-suspended",
-  "/auth",             // /auth/login, /auth/logout, etc.
+  "/auth", // /auth/login, /auth/logout, etc.
 ];
 
 function isPublicRoute(pathname: string): boolean {
@@ -28,7 +28,6 @@ export function Providers({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
 
   const lastPathRef = useRef<string | null>(null);
   const [isCheckingSession, setIsCheckingSession] = useState(false);
@@ -64,12 +63,14 @@ export function Providers({
         });
 
         if (res.status === 401) {
+          // 🔒 Session expired / invalid → full logout
           window.location.href = "/auth/logout";
           return;
         }
 
         if (res.status === 403) {
-          router.replace("/account-suspended");
+          // ⛔ Suspended account → hard redirect
+          window.location.href = "/account-suspended";
           return;
         }
 
@@ -82,13 +83,13 @@ export function Providers({
     };
 
     revalidateSession();
-  }, [pathname, router]);
+  }, [pathname]);
 
   /**
    * ⛔ Block rendering protected pages during session check
    */
   if (isCheckingSession) {
-    return null; // or a global spinner if you prefer
+    return null; // you can replace with a global spinner later
   }
 
   return <>{children}</>;

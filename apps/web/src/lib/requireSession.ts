@@ -7,20 +7,14 @@ import { getSessionExpiry } from "@/lib/session";
  * Enforces:
  * - session existence
  * - revocation
- * - sliding inactivity timeout (STRICT)
+ * - STRICT inactivity timeout (with correct first-use handling)
  * - user + corporate account ACTIVE status
  *
- * IMPORTANT BEHAVIOR:
- * - If the user is inactive beyond SESSION_TIMEOUT_MINUTES,
- *   the FIRST request AFTER inactivity FAILS.
- * - Sessions are only refreshed if they were already valid.
- * - Suspended users / accounts are immediately cut off.
+ * IMPORTANT BEHAVIOR (FIXED):
+ * - A session is ALWAYS valid on its first authenticated request.
+ * - Inactivity timeout is enforced ONLY after first use.
  */
 
-/**
- * Result type that PRESERVES why a session failed.
- * This is critical for correct routing behavior.
- */
 export type RequireSessionResult =
   | { kind: "VALID"; session: any }
   | { kind: "SUSPENDED" }
@@ -60,7 +54,6 @@ export async function requireSession(
    */
   const user = session.user;
 
-  // User must be ACTIVE
   if (user.status !== "ACTIVE") {
     await prisma.session.update({
       where: { id: session.id },
@@ -73,7 +66,6 @@ export async function requireSession(
     return { kind: "SUSPENDED" };
   }
 
-  // If corporate user, corporate account must also be ACTIVE
   if (
     user.corporateAccountId &&
     user.corporateAccount &&
@@ -93,35 +85,48 @@ export async function requireSession(
   const now = new Date();
 
   /**
-   * 3️⃣ STRICT inactivity timeout check
+   * 3️⃣ FIRST-USE INITIALIZATION (CRITICAL FIX)
+   *
+   * If lastSeenAt is null, this is the FIRST authenticated request.
+   * We must initialize the sliding window and allow the session.
    */
-  if (session.lastSeenAt) {
-    const timeoutMinutes =
-      Number(process.env.SESSION_TIMEOUT_MINUTES) || 60;
+  if (!session.lastSeenAt) {
+    await prisma.session.update({
+      where: { id: session.id },
+      data: {
+        lastSeenAt: now,
+        expiresAt: getSessionExpiry(),
+      },
+    });
 
-    const inactivityDeadline = new Date(
-      session.lastSeenAt.getTime() +
-      timeoutMinutes * 60 * 1000
-    );
-
-    if (now > inactivityDeadline) {
-      // Revoke immediately so other tabs/devices are cut off
-      await prisma.session.update({
-        where: { id: session.id },
-        data: {
-          revokedAt: now,
-          revokedReason: "TIMEOUT",
-        },
-      });
-
-      return { kind: "INVALID" };
-    }
+    return { kind: "VALID", session };
   }
 
   /**
-   * 4️⃣ Sliding window refresh
-   *
-   * ONLY happens if session was already valid.
+   * 4️⃣ STRICT inactivity timeout (AFTER first use)
+   */
+  const timeoutMinutes =
+    Number(process.env.SESSION_TIMEOUT_MINUTES) || 60;
+
+  const inactivityDeadline = new Date(
+    session.lastSeenAt.getTime() +
+    timeoutMinutes * 60 * 1000
+  );
+
+  if (now > inactivityDeadline) {
+    await prisma.session.update({
+      where: { id: session.id },
+      data: {
+        revokedAt: now,
+        revokedReason: "TIMEOUT",
+      },
+    });
+
+    return { kind: "INVALID" };
+  }
+
+  /**
+   * 5️⃣ Sliding window refresh (valid session)
    */
   await prisma.session.update({
     where: { id: session.id },

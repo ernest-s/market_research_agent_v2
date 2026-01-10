@@ -17,7 +17,12 @@ export default function DashboardPage() {
   const [user, setUser] = useState<User | null>(null);
 
   /**
-   * 1️⃣ Bootstrap user data
+   * 1️⃣ Fetch dashboard data
+   *
+   * Assumptions:
+   * - Session validity is enforced by layout + Providers
+   * - Session conflicts are resolved before reaching this page
+   * - Any non-200 here is unexpected and treated as fatal
    */
   const runBootstrap = async () => {
     try {
@@ -25,42 +30,24 @@ export default function DashboardPage() {
         method: "POST",
       });
 
-      if (res.status === 401) {
-        router.replace("/login");
-        return;
-      }
-
-      if (res.status === 403) {
-        const data = await res.json();
-
-        if (data?.error === "ACCOUNT_SUSPENDED") {
-          router.replace("/account-suspended");
-          return;
-        }
-
-        // Default 403 = email verification
-        router.replace("/verify-email");
-        return;
-      }
-
       if (!res.ok) {
-        console.error("Bootstrap failed");
-        router.replace("/login");
+        console.error("Dashboard bootstrap failed", res.status);
+        router.replace("/auth/logout");
         return;
       }
 
       const data = await res.json();
       setUser(data.user);
     } catch (err) {
-      console.error("Bootstrap error", err);
-      router.replace("/login");
+      console.error("Dashboard bootstrap error", err);
+      router.replace("/auth/logout");
     } finally {
       setLoading(false);
     }
   };
 
   /**
-   * 2️⃣ Initial bootstrap (run once)
+   * 2️⃣ Run once on mount
    */
   useEffect(() => {
     if (bootstrappedRef.current) return;
@@ -69,7 +56,7 @@ export default function DashboardPage() {
   }, []);
 
   /**
-   * 🔒 Loading guard
+   * 🔒 Loading state (pure UI)
    */
   if (loading) {
     return (
@@ -81,6 +68,7 @@ export default function DashboardPage() {
 
   /**
    * 🔒 Safety guard
+   * (Should never happen if architecture is respected)
    */
   if (!user) {
     return null;

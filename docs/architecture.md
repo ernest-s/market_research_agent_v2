@@ -387,3 +387,25 @@ requireAppSession()
                 ▼
             /auth/logout
 ```
+### Final Architecture
+```
+┌─────────────────────┐
+│ Browser Navigation  │
+└─────────┬───────────┘
+          ↓
+┌─────────────────────┐
+│ Providers.tsx       │  ← GLOBAL GATE
+│ (client-side)       │
+└─────────┬───────────┘
+          ↓ POST /api/auth/revalidate
+┌─────────────────────┐
+│ requireSession      │
+│ (server-side)       │
+└─────────┬───────────┘
+          ↓
+   ┌──────────────┬──────────────┐
+   │ VALID        │ INVALID       │
+   │              │               │
+   ↓              ↓               ↓
+Render UI     /auth/logout   /account-suspended
+```

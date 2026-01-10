@@ -27,8 +27,7 @@ export async function GET(req: NextRequest) {
      */
     const issuerBaseUrl = process.env.AUTH0_ISSUER_BASE_URL!;
     const clientId = process.env.AUTH0_CLIENT_ID!;
-    const returnTo =
-      process.env.AUTH0_BASE_URL || "http://localhost:3000/login";
+    const returnTo = `${process.env.AUTH0_BASE_URL}/login`;
 
     const logoutUrl =
       `${issuerBaseUrl}/v2/logout` +
