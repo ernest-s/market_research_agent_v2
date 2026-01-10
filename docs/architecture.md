@@ -275,3 +275,115 @@ This architecture deliberately separates:
 
 The result is a secure, scalable, enterprise-ready SaaS foundation designed
 to support long-term evolution without architectural rewrites.
+
+---
+
+## Centralized Control-Flow
+
+### Three concentric security rings:
+
+```
+┌───────────────────────────┐
+│ Browser / Navigation      │  ← Providers.tsx
+├───────────────────────────┤
+│ Server Layout Boundary    │  ← requireAppSession()
+├───────────────────────────┤
+│ Database Truth            │  ← requireSession()
+└───────────────────────────┘
+
+```
+### Full Control-flow
+```
+Browser requests /dashboard
+        │
+        ▼
+(app)/(app)/layout.tsx  [SERVER]
+        │
+        ▼
+requireAppSession()
+        │
+        ▼
+requireSession(sessionId)
+        │
+        ├── INVALID (expired / revoked / missing)
+        │       → redirect("/auth/logout")  ❗ immediate
+        │
+        ├── SUSPENDED
+        │       → redirect("/account-suspended")
+        │
+        └── VALID
+                ↓
+        AppShell renders (TopBar + Sidebar + Page)
+```
+
+### Client-side navigation
+
+```
+User clicks link
+        │
+        ▼
+Providers.tsx  [CLIENT]
+        │
+        ├─ Public route?
+        │      → allow immediately
+        │
+        └─ Protected route
+               │
+               ▼
+        POST /api/auth/revalidate
+               │
+               ├── 401 / INVALID
+               │       → window.location = /auth/logout
+               │
+               ├── 403 / SUSPENDED
+               │       → /account-suspended
+               │
+               ├── 409 / SESSION_CONFLICT
+               │       → /session-conflict
+               │
+               └── 200 OK
+                       ↓
+               Navigation allowed
+```
+### Login flow
+```
+User logs in via Auth0
+        │
+        ▼
+/api/auth/callback
+        │
+        ├── create NEW app session
+        │
+        ▼
+redirect → /dashboard
+Then immediately
+/dashboard request
+        │
+        ▼
+requireAppSession()
+        │
+        ├── detects another ACTIVE session
+        │
+        └── redirect → /session-conflict
+
+```
+### Session-conflict resolution
+
+```
+/session-conflict page
+        │
+        ├── Proceed here
+        │       │
+        │       ▼
+        │   POST /api/auth/session/override
+        │       │
+        │       ├── revoke other sessions (OVERRIDDEN)
+        │       └── keep current session
+        │
+        │       → redirect /dashboard
+        │
+        └── Cancel
+                │
+                ▼
+            /auth/logout
+```
