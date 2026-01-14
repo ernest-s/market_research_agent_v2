@@ -9,13 +9,15 @@ export function GET(req: Request) {
     response_type: "code",
     scope: "openid profile email",
     redirect_uri: `${process.env.AUTH0_BASE_URL}/api/auth/callback`,
+    prompt: "login", // 🔑 FORCE continue / login screen
   });
 
   if (screenHint === "signup") {
     params.set("screen_hint", "signup");
   }
 
-  const authorizeUrl = `${process.env.AUTH0_ISSUER_BASE_URL}/authorize?${params.toString()}`;
+  const authorizeUrl =
+    `${process.env.AUTH0_ISSUER_BASE_URL}/authorize?${params.toString()}`;
 
   return NextResponse.redirect(authorizeUrl);
 }
