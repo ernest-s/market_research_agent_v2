@@ -12,6 +12,7 @@ const PUBLIC_ROUTE_PREFIXES = [
   "/verify-email",
   "/account-suspended",
   "/auth", // /auth/login, /auth/logout, etc.
+  "/session-conflict", // session conflict resolution
 ];
 
 function isPublicRoute(pathname: string): boolean {
@@ -31,6 +32,7 @@ export function Providers({
 
   const lastPathRef = useRef<string | null>(null);
   const [isCheckingSession, setIsCheckingSession] = useState(false);
+
 
   useEffect(() => {
     // Initial mount

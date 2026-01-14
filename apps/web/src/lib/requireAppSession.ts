@@ -4,6 +4,19 @@ import { requireSession } from "@/lib/requireSession";
 
 const APP_SESSION_COOKIE = "app_session_id";
 
+/**
+ * requireAppSession
+ *
+ * Centralized access control for all authenticated app routes.
+ *
+ * Responsibilities:
+ * - Read session cookie
+ * - Delegate validation to requireSession
+ * - Translate session states into routing decisions
+ *
+ * IMPORTANT:
+ * - Layouts and pages must NOT contain auth logic
+ */
 export async function requireAppSession() {
     const cookieStore = await cookies();
 
@@ -14,18 +27,27 @@ export async function requireAppSession() {
 
     /**
      * ❌ No valid session (expired / missing / revoked)
-     * → Force full logout to clear IdP session
+     * → Force logout (clears IdP + app cookies)
      */
     if (result.kind === "INVALID") {
-        redirect("/login?reason=timeout");
+        redirect("/auth/logout");
     }
-
 
     /**
      * ⛔ Authenticated but suspended
      */
     if (result.kind === "SUSPENDED") {
         redirect("/account-suspended");
+    }
+
+    /**
+     * ⚠️ Single-session conflict detected
+     *
+     * Another active session exists for this user.
+     * Block app access and route to conflict resolution page.
+     */
+    if (result.kind === "SESSION_CONFLICT") {
+        redirect("/session-conflict");
     }
 
     /**

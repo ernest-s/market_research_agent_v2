@@ -9,16 +9,19 @@ import { getSessionExpiry } from "@/lib/session";
  * - revocation
  * - STRICT inactivity timeout (with correct first-use handling)
  * - user + corporate account ACTIVE status
+ * - SINGLE-SESSION conflict detection (NON-DESTRUCTIVE)
  *
- * IMPORTANT BEHAVIOR (FIXED):
+ * IMPORTANT BEHAVIOR:
  * - A session is ALWAYS valid on its first authenticated request.
  * - Inactivity timeout is enforced ONLY after first use.
+ * - Session conflict is DETECTED here, but ENFORCED elsewhere.
  */
 
 export type RequireSessionResult =
   | { kind: "VALID"; session: any }
   | { kind: "SUSPENDED" }
-  | { kind: "INVALID" };
+  | { kind: "INVALID" }
+  | { kind: "SESSION_CONFLICT"; session: any };
 
 export async function requireSession(
   sessionId: string | null
@@ -85,7 +88,7 @@ export async function requireSession(
   const now = new Date();
 
   /**
-   * 3️⃣ FIRST-USE INITIALIZATION (CRITICAL FIX)
+   * 3️⃣ FIRST-USE INITIALIZATION
    *
    * If lastSeenAt is null, this is the FIRST authenticated request.
    * We must initialize the sliding window and allow the session.
@@ -126,7 +129,27 @@ export async function requireSession(
   }
 
   /**
-   * 5️⃣ Sliding window refresh (valid session)
+   * 5️⃣ SINGLE-SESSION CONFLICT DETECTION (READ-ONLY)
+   *
+   * Detect another active session for the same user.
+   * Do NOT revoke anything here.
+   */
+  const otherActiveSession = await prisma.session.findFirst({
+    where: {
+      userId: session.userId,
+      revokedAt: null,
+      expiresAt: { gt: now },
+      NOT: { id: session.id },
+    },
+    select: { id: true },
+  });
+
+  if (otherActiveSession) {
+    return { kind: "SESSION_CONFLICT", session };
+  }
+
+  /**
+   * 6️⃣ Sliding window refresh (valid session)
    */
   await prisma.session.update({
     where: { id: session.id },
