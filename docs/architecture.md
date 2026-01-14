@@ -6,16 +6,19 @@ This repository is a **monorepo** containing a production-grade, enterprise SaaS
 
 * A **Next.js 16 frontend** (App Router)
 * **Auth0-based authentication** with app-level session enforcement
+* **Application-level session enforcement**
 * **PostgreSQL + Prisma** as the system of record
 * **Agentic AI services** (LangGraph-based) in a separate services workspace
 * Background jobs (cron) for maintenance tasks
 
 The architecture is intentionally designed for:
 
-* Security (single-session enforcement)
+* Strong security (strict inactivity timeout, single-session enforcement)
+* Clear separation of identity vs access
+* Centralized authorization logic
 * Scalability (clear frontend / services separation)
 * Maintainability (single Prisma schema and migration history)
-* Auditability (admin-only, append-only audit logs)
+* Auditability (admin-only, append-only audit logs) and future compliance
 
 ---
 
@@ -23,34 +26,34 @@ The architecture is intentionally designed for:
 
 ```
 root/
-├── package.json            # Workspace root (Prisma + shared deps)
+├── package.json
 ├── prisma/
-│   ├── schema.prisma       # Single source of truth
+│   ├── schema.prisma
 │   └── migrations/
 │
-├── frontend/
-│   ├── package.json
-│   ├── src/
-│   │   ├── app/            # Next.js App Router
-│   │   │   ├── api/        # Backend API routes
-│   │   │   ├── admin/      # Corporate admin UI
-│   │   │   └── auth/       # Auth bootstrap + password reset
-│   │   ├── components/
-│   │   └── lib/
-│   │       ├── prisma.ts
-│   │       ├── requireSession.ts
-│   │       ├── requireCorporateAdmin.ts
-│   │       └── auth helpers
-│   └── .env.local
+├── apps/
+│   └── web/
+│       ├── src/
+│       │   ├── app/
+│       │   │   ├── api/
+│       │   │   ├── auth/
+│       │   │   ├── session-conflict/
+│       │   │   └── (app)/
+│       │   ├── components/
+│       │   └── lib/
+│       │       ├── prisma.ts
+│       │       ├── requireSession.ts
+│       │       └── requireAppSession.ts
+│       └── .env.local
 │
 └── services/
-    ├── study_design_agent/ # LangGraph-based agents
+    ├── study_design_agent/
     └── cron/
         └── cleanupSessions.ts
+
 ```
 
 ---
-
 ## Authentication & Session Model
 
 ### Identity vs Session
@@ -60,11 +63,11 @@ root/
 | Auth0       | Identity, login, email verification, password reset |
 | App Session | Single-session enforcement, timeout, revocation     |
 
-Auth0 is **not** used to manage active sessions. All runtime access is governed by the application session layer.
+Auth0 is **not** used to manage active sessions. All runtime access is governed by **application-managed sessions** stored in Postgres.
 
 ---
 
-## App-Level Session System
+## Application Session Model
 
 ### Session Storage
 
@@ -86,13 +89,20 @@ Key fields:
 ### Session Lifecycle
 
 1. User authenticates with Auth0
-2. `/api/auth/bootstrap`
+2. Auth0 redirects to `/api/auth/callback`
+3. Callback:
+   * Resolves user (auth0Sub <-> email)
+   * **Always creates a new app session**
+   * Sets `app_session_id` cookie
+4. User is redirected to `/dashboard`
 
-   * Provisions or loads user
-   * Enforces email verification
-   * Creates or validates app session
-3. Session ID stored as HttpOnly cookie
-4. All authenticated APIs validate session via `requireSession`
+### Session Validation
+All protected access flows through `requireSession()`
+`requireSession()` enforces:
+* Session existence
+* Revocation status
+* Strict inactivity timeout
+* User + Corporate Account ACTIVE status
 
 ### Sliding Inactivity Timeout
 
@@ -101,34 +111,104 @@ Sessions enforce a **strict sliding inactivity timeout** controlled by the
 
 Behavior:
 
-* `lastSeenAt` tracks the timestamp of the **last successful authenticated request**
-* If **no backend activity** occurs within the configured timeout window:
+* `lastSeenAt` is updated **only on successful authenticated requests**
+* If inactivity exceeds the timeout:
   * The **first request after inactivity fails**
   * The session is immediately revoked with reason `TIMEOUT`
-  * The user is redirected to `/login`
-* Sessions are **only refreshed if already valid**
-* No request can resurrect an expired session
+  * User is forced through logout
+* Expired sessions **cannot be resurrected**
 
-This ensures true inactivity-based logout semantics consistent with
-enterprise SaaS security expectations.
+This ensures true inactivity-based logout semantics consistent with enterprise SaaS security expectations.
 
 
 ---
 
 ## Single-Session Enforcement
 
+### Policy
 * A user may only have **one active session** at a time
-* If another session exists:
+* Logging in from another browser creates a new session
+* Older sessions are **not automatically revoked**
+* Instead, conflicts are **explicitly resolved by the user**
 
-  * Dashboard shows a **modal conflict dialog**
-  * User may cancel or override
-* Override revokes the old session immediately
+### Conflict Detection
+Conflicts are detected when:
+* A valid session exists for the same user
+* A different `app_session_id` is presented
+When detected:
+* User is redirected to `/session-conflict`
 
-This is enforced:
+### Conflict Resolution
+On `/session-conflict`:
+* **Proceed here**
+  * Calls `/api/auth/session/override`
+  * Revokes all other sessions (`OVERRIDDEN`)
+  * Keeps the current session active
+* Cancel
+  * Logs out the current browser via `/auth/logout`
+This ensures explicit user intent and avoids silent takeovers. 
 
-* At API level (`requireSession`)
-* At UI level (dashboard bootstrap)
-
+---
+## Centralized Access Control
+### Three Security Rings
+```
+┌───────────────────────────┐
+│ Browser / Navigation      │  ← Providers.tsx
+├───────────────────────────┤
+│ Server Layout Boundary    │  ← requireAppSession()
+├───────────────────────────┤
+│ Database Truth            │  ← requireSession()
+└───────────────────────────┘
+```
+### Server-Side Entry (Hard Gate)
+```
+/(app)/layout.tsx
+        │
+        ▼
+requireAppSession()
+        │
+        ▼
+requireSession()
+        │
+        ├── INVALID
+        │       → redirect /auth/logout
+        │
+        ├── SUSPENDED
+        │       → redirect /account-suspended
+        │
+        └── VALID
+                ↓
+        AppShell renders
+```
+### Client-Side Navigation
+```
+User clicks link
+        │
+        ▼
+Providers.tsx
+        │
+        ├─ Public route → allow
+        │
+        └─ Protected route
+               │
+               ▼
+        POST /api/auth/revalidate
+               │
+               ├── 401 → /auth/logout
+               ├── 403 → /account-suspended
+               └── 200 → allow navigation
+```
+### Bootstrap API
+`/api/auth/bootstrap` is **read-only**.
+Responsibilities:
+* Decode Auth0 identity
+* Resolve user record
+* Return enriched user + account context
+It **does not**:
+* Create sessions
+* Validate sessions
+* Handle conflicts
+Bootstrap is safe to call repeatedly. 
 ---
 ## Corporate Accounts & Roles
 
@@ -189,6 +269,14 @@ All **admin actions** are recorded in an **append-only audit log** for:
 * User reactivated
 * Password reset triggered
 
+---
+## Design Principles
+* Backend-first security
+* Explicit session semantics
+* No hidden auth state
+* Clear identity vs authorization boundary
+* Auditability by design
+* No UI-only enforcement
 ---
 
 ## Middleware Strategy
@@ -269,143 +357,13 @@ This architecture deliberately separates:
 
 * Identity (Auth0)
 * Authorization (app sessions)
+* Access control (App sessions)
 * Administration – Corporate admin APIs + audit logs
 * UI (Next.js)
+* Conflict resolution (explicit user action)
 * Intelligence (agents)
 
-The result is a secure, scalable, enterprise-ready SaaS foundation designed
-to support long-term evolution without architectural rewrites.
+The result is a predictable, secure, enterprise-grade SaaS foundation
+that avoids implicit auth state and supports long-term evolution.
 
 ---
-
-## Centralized Control-Flow
-
-### Three concentric security rings:
-
-```
-┌───────────────────────────┐
-│ Browser / Navigation      │  ← Providers.tsx
-├───────────────────────────┤
-│ Server Layout Boundary    │  ← requireAppSession()
-├───────────────────────────┤
-│ Database Truth            │  ← requireSession()
-└───────────────────────────┘
-
-```
-### Full Control-flow
-```
-Browser requests /dashboard
-        │
-        ▼
-(app)/(app)/layout.tsx  [SERVER]
-        │
-        ▼
-requireAppSession()
-        │
-        ▼
-requireSession(sessionId)
-        │
-        ├── INVALID (expired / revoked / missing)
-        │       → redirect("/auth/logout")  ❗ immediate
-        │
-        ├── SUSPENDED
-        │       → redirect("/account-suspended")
-        │
-        └── VALID
-                ↓
-        AppShell renders (TopBar + Sidebar + Page)
-```
-
-### Client-side navigation
-
-```
-User clicks link
-        │
-        ▼
-Providers.tsx  [CLIENT]
-        │
-        ├─ Public route?
-        │      → allow immediately
-        │
-        └─ Protected route
-               │
-               ▼
-        POST /api/auth/revalidate
-               │
-               ├── 401 / INVALID
-               │       → window.location = /auth/logout
-               │
-               ├── 403 / SUSPENDED
-               │       → /account-suspended
-               │
-               ├── 409 / SESSION_CONFLICT
-               │       → /session-conflict
-               │
-               └── 200 OK
-                       ↓
-               Navigation allowed
-```
-### Login flow
-```
-User logs in via Auth0
-        │
-        ▼
-/api/auth/callback
-        │
-        ├── create NEW app session
-        │
-        ▼
-redirect → /dashboard
-Then immediately
-/dashboard request
-        │
-        ▼
-requireAppSession()
-        │
-        ├── detects another ACTIVE session
-        │
-        └── redirect → /session-conflict
-
-```
-### Session-conflict resolution
-
-```
-/session-conflict page
-        │
-        ├── Proceed here
-        │       │
-        │       ▼
-        │   POST /api/auth/session/override
-        │       │
-        │       ├── revoke other sessions (OVERRIDDEN)
-        │       └── keep current session
-        │
-        │       → redirect /dashboard
-        │
-        └── Cancel
-                │
-                ▼
-            /auth/logout
-```
-### Final Architecture
-```
-┌─────────────────────┐
-│ Browser Navigation  │
-└─────────┬───────────┘
-          ↓
-┌─────────────────────┐
-│ Providers.tsx       │  ← GLOBAL GATE
-│ (client-side)       │
-└─────────┬───────────┘
-          ↓ POST /api/auth/revalidate
-┌─────────────────────┐
-│ requireSession      │
-│ (server-side)       │
-└─────────┬───────────┘
-          ↓
-   ┌──────────────┬──────────────┐
-   │ VALID        │ INVALID       │
-   │              │               │
-   ↓              ↓               ↓
-Render UI     /auth/logout   /account-suspended
-```
