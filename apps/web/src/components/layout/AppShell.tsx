@@ -1,10 +1,11 @@
 import { ReactNode } from "react";
+import { AppSession } from "@/lib/requireSession";
 import { TopBar } from "./TopBar";
 import { Sidebar } from "./Sidebar";
 
 export type AppShellProps = {
     children: ReactNode;
-    session: any;
+    session: AppSession;
 };
 
 export function AppShell({ children, session }: AppShellProps) {

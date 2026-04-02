@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSessionExpiry } from "@/lib/session";
 
@@ -17,11 +18,21 @@ import { getSessionExpiry } from "@/lib/session";
  * - Session conflict is DETECTED here, but ENFORCED elsewhere.
  */
 
+export type AppSession = Prisma.SessionGetPayload<{
+  include: {
+    user: {
+      include: {
+        corporateAccount: true;
+      };
+    };
+  };
+}>;
+
 export type RequireSessionResult =
-  | { kind: "VALID"; session: any }
+  | { kind: "VALID"; session: AppSession }
   | { kind: "SUSPENDED" }
   | { kind: "INVALID" }
-  | { kind: "SESSION_CONFLICT"; session: any };
+  | { kind: "SESSION_CONFLICT"; session: AppSession };
 
 export async function requireSession(
   sessionId: string | null

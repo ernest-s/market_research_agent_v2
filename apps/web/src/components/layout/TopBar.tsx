@@ -2,8 +2,9 @@
 
 import Image from "next/image";
 import UserMenu from "@/components/UserMenu";
+import type { AppSession } from "@/lib/requireSession";
 
-export function TopBar({ session }: { session: any }) {
+export function TopBar({ session }: { session: AppSession }) {
     return (
         <header
             style={{

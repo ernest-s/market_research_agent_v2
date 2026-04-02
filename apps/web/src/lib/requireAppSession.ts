@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { requireSession } from "@/lib/requireSession";
+import { requireSession, AppSession } from "@/lib/requireSession";
 
 const APP_SESSION_COOKIE = "app_session_id";
 
@@ -17,7 +17,7 @@ const APP_SESSION_COOKIE = "app_session_id";
  * IMPORTANT:
  * - Layouts and pages must NOT contain auth logic
  */
-export async function requireAppSession() {
+export async function requireAppSession(): Promise<AppSession> {
     const cookieStore = await cookies();
 
     const sessionId =

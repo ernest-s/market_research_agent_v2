@@ -1,4 +1,4 @@
-import { requireSession } from "@/lib/requireSession";
+import { requireSession, AppSession } from "@/lib/requireSession";
 
 /**
  * requireCorporateAdmin
@@ -16,7 +16,7 @@ import { requireSession } from "@/lib/requireSession";
  * - Backward compatible with existing callers
  * - Handles RequireSessionResult correctly
  */
-export async function requireCorporateAdmin(sessionId: string | null) {
+export async function requireCorporateAdmin(sessionId: string | null): Promise<AppSession | null> {
   const result = await requireSession(sessionId);
 
   // ❌ No valid session
