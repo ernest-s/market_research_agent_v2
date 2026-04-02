@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 type Profile = {
   firstName?: string | null;
@@ -17,9 +17,6 @@ type AccountMeta = {
 
 export default function ProfilePage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-
-  const passwordSent = searchParams.get("passwordSent") === "1";
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -229,26 +226,17 @@ export default function ProfilePage() {
           <div className="flex items-start justify-between">
             <div>
               <p className="font-medium">Password</p>
-
-              {passwordSent ? (
-                <p className="text-sm text-green-700 mt-1">
-                  Password reset email sent. Please check your inbox.
-                </p>
-              ) : (
-                <p className="text-sm text-gray-600 mt-1">
-                  Change your account password.
-                </p>
-              )}
+              <p className="text-sm text-gray-600 mt-1">
+                Change your account password.
+              </p>
             </div>
 
-            {!passwordSent && (
-              <a
-                href="/auth/change-password"
-                className="text-sm underline"
-              >
-                Change password
-              </a>
-            )}
+            <a
+              href="/auth/change-password"
+              className="text-sm underline"
+            >
+              Change password
+            </a>
           </div>
         </section>
       </main>

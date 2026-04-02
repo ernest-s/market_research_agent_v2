@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyIdToken } from "@/lib/verifyIdToken";
+import { revokeUserSessions } from "@/lib/session";
+import { setAuth0UserBlocked } from "@/lib/auth0Management";
 
 export async function GET(req: NextRequest) {
   try {
@@ -44,16 +46,31 @@ export async function GET(req: NextRequest) {
     });
 
     if (activeSessions > 1) {
-      // Redirect to conflict resolution
       return NextResponse.redirect(
         new URL("/session-conflict", req.url)
       );
     }
 
     /**
-     * 4️⃣ Trigger Auth0 password reset email
+     * 4️⃣ Block user in Auth0
+     *
+     * Prevents login with old password until the reset is completed.
      */
-    const res = await fetch(
+    try {
+      await setAuth0UserBlocked(decoded.sub, true);
+    } catch (err) {
+      console.error("Failed to block Auth0 user:", err);
+      return NextResponse.redirect(
+        new URL("/profile?passwordError=1", req.url)
+      );
+    }
+
+    /**
+     * 5️⃣ Trigger Auth0 password reset email
+     *
+     * If this fails, unblock the user to restore their access.
+     */
+    const resetRes = await fetch(
       `https://${process.env.AUTH0_ISSUER_BASE_URL!.replace(
         "https://",
         ""
@@ -69,16 +86,34 @@ export async function GET(req: NextRequest) {
       }
     );
 
-    if (!res.ok) {
-      console.error("Auth0 change password error:", await res.text());
+    if (!resetRes.ok) {
+      console.error("Auth0 change password error:", await resetRes.text());
+      try {
+        await setAuth0UserBlocked(decoded.sub, false);
+      } catch (unblockErr) {
+        console.error("Failed to unblock Auth0 user after email failure:", unblockErr);
+      }
       return NextResponse.redirect(
         new URL("/profile?passwordError=1", req.url)
       );
     }
 
-    return NextResponse.redirect(
-      new URL("/profile?passwordSent=1", req.url)
+    /**
+     * 6️⃣ Revoke all active sessions — force sign-out across all devices
+     */
+    await revokeUserSessions(user.id, "LOGOUT");
+
+    /**
+     * 7️⃣ Clear cookies and redirect to confirmation page
+     */
+    const res = NextResponse.redirect(
+      new URL("/password-reset-sent", req.url)
     );
+
+    res.cookies.set("app_session_id", "", { path: "/", maxAge: 0 });
+    res.cookies.set("auth0_id_token", "", { path: "/", maxAge: 0 });
+
+    return res;
   } catch (err) {
     console.error("Change password error:", err);
     return NextResponse.redirect(

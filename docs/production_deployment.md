@@ -35,6 +35,11 @@ AUTH0_BASE_URL=
 AUTH0_SECRET=
 SESSION_TIMEOUT_MINUTES=60
 NEXT_PUBLIC_ENFORCE_EMAIL_VERIFICATION=true
+
+# Machine-to-Machine (Management API) — used for user invite, block, and password reset
+AUTH0_MANAGEMENT_DOMAIN=
+AUTH0_MANAGEMENT_CLIENT_ID=
+AUTH0_MANAGEMENT_CLIENT_SECRET=
 ```
 
 Never reuse dev credentials in production.
@@ -54,6 +59,16 @@ Never reuse dev credentials in production.
 * Disable implicit flows
 * Configure allowed callback URLs
 * Configure allowed logout URLs
+
+### Actions
+
+Deploy the Post Change Password action before go-live. See `auth0/actions/README.md` for
+step-by-step instructions. This action unblocks users after they complete a password reset.
+Both flows block the user in Auth0 until the reset is completed:
+- Admin-triggered reset (corporate admin resets a member's password)
+- Self-service reset (user resets their own password from the Account page)
+
+Without this action, users will be permanently blocked after any password reset.
 
 ---
 
@@ -112,7 +127,7 @@ Ensure:
 ## 7. Frontend Build
 
 ```bash
-cd frontend
+cd apps/web
 npm run build
 npm run start
 ```
@@ -128,9 +143,10 @@ Ensure:
 
 * HttpOnly cookies only
 * Secure cookies in HTTPS
-* No JWT decoding outside bootstrap
+* Auth0 ID tokens verified with RS256 signature validation (not just decoded)
 * No Prisma writes in middleware
 * Single active session enforced
+* Forced password reset blocks user in Auth0 until new password is set
 
 ---
 
@@ -157,7 +173,10 @@ Recommended:
 * [ ] Email verification enforced
 * [ ] Single-session override tested
 * [ ] Session timeout tested
-* [ ] Password reset tested
+* [ ] Admin-triggered password reset tested (user blocked until reset complete)
+* [ ] Self-service password reset tested (user blocked and signed out until reset complete)
+* [ ] Auth0 Post Change Password action deployed and attached to flow
+* [ ] Management API env vars set (AUTH0_MANAGEMENT_DOMAIN/CLIENT_ID/CLIENT_SECRET)
 * [ ] Cron job running
 * [ ] Prisma schema locked
 * [ ] Secrets rotated

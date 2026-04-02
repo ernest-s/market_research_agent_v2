@@ -13,6 +13,7 @@ const PUBLIC_ROUTE_PREFIXES = [
   "/account-suspended",
   "/auth", // /auth/login, /auth/logout, etc.
   "/session-conflict", // session conflict resolution
+  "/password-reset-sent", // shown after self-service password reset
 ];
 
 function isPublicRoute(pathname: string): boolean {

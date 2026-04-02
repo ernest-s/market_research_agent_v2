@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireCorporateAdmin } from "@/lib/requireCorporateAdmin";
+import { revokeUserSessions } from "@/lib/session";
+import { setAuth0UserBlocked } from "@/lib/auth0Management";
 
 export async function POST(
     req: NextRequest,
@@ -74,7 +76,34 @@ export async function POST(
     }
 
     /**
-     * 4️⃣ Trigger Auth0 password reset email
+     * 🚫 Guard against missing Auth0 identity
+     */
+    if (!targetUser.auth0Sub) {
+        return NextResponse.json(
+            { error: "User has no Auth0 identity" },
+            { status: 500 }
+        );
+    }
+
+    /**
+     * 4️⃣ Block user in Auth0
+     *
+     * Prevents login with old password until they complete the reset.
+     */
+    try {
+        await setAuth0UserBlocked(targetUser.auth0Sub, true);
+    } catch (err) {
+        console.error("Failed to block Auth0 user:", err);
+        return NextResponse.json(
+            { error: "Failed to block user — password reset aborted" },
+            { status: 500 }
+        );
+    }
+
+    /**
+     * 5️⃣ Trigger Auth0 password reset email
+     *
+     * If this fails, unblock the user to restore their previous access.
      */
     const resetRes = await fetch(
         `https://${process.env.AUTH0_ISSUER_BASE_URL!.replace(
@@ -96,6 +125,13 @@ export async function POST(
         const text = await resetRes.text();
         console.error("Reset password error:", text);
 
+        // Compensating action: unblock since email failed
+        try {
+            await setAuth0UserBlocked(targetUser.auth0Sub, false);
+        } catch (unblockErr) {
+            console.error("Failed to unblock Auth0 user after email failure:", unblockErr);
+        }
+
         return NextResponse.json(
             { error: "Failed to send password reset email" },
             { status: 500 }
@@ -103,7 +139,14 @@ export async function POST(
     }
 
     /**
-     * 🧾 5️⃣ Admin audit log (append-only)
+     * 6️⃣ Revoke all active app sessions
+     *
+     * Forces the user off the app immediately.
+     */
+    await revokeUserSessions(targetUser.id, "LOGOUT");
+
+    /**
+     * 🧾 7️⃣ Admin audit log (append-only)
      */
     await prisma.adminAuditLog.create({
         data: {
@@ -115,6 +158,7 @@ export async function POST(
             corporateAccountId: session.user.corporateAccountId,
             metadata: {
                 targetUserEmail: targetUser.email,
+                auth0Blocked: true,
             },
         },
     });

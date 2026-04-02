@@ -1,33 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireCorporateAdmin } from "@/lib/requireCorporateAdmin";
-
-/**
- * Helper: get Auth0 Management API token
- */
-async function getManagementToken() {
-  const res = await fetch(
-    `https://${process.env.AUTH0_MANAGEMENT_DOMAIN}/oauth/token`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        grant_type: "client_credentials",
-        client_id: process.env.AUTH0_MANAGEMENT_CLIENT_ID,
-        client_secret: process.env.AUTH0_MANAGEMENT_CLIENT_SECRET,
-        audience: `https://${process.env.AUTH0_MANAGEMENT_DOMAIN}/api/v2/`,
-      }),
-    }
-  );
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Failed to get management token: ${text}`);
-  }
-
-  const data = await res.json();
-  return data.access_token as string;
-}
+import { getManagementToken } from "@/lib/auth0Management";
 
 /**
  * GET /api/org-admin/users
