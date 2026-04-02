@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { prisma } from "@/lib/prisma";
-
-type IdTokenPayload = {
-  sub?: string;
-  email?: string;
-};
+import { verifyIdToken } from "@/lib/verifyIdToken";
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,9 +16,10 @@ export async function POST(req: NextRequest) {
       throw new Error("Missing Auth0 ID token");
     }
 
-    const decoded = jwt.decode(idToken) as IdTokenPayload | null;
-
-    if (!decoded?.sub || !decoded?.email) {
+    let decoded;
+    try {
+      decoded = await verifyIdToken(idToken);
+    } catch {
       throw new Error("Invalid Auth0 ID token");
     }
 

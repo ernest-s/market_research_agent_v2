@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { prisma } from "@/lib/prisma";
 import { getSessionExpiry, revokeUserSessions } from "@/lib/session";
-
-type IdTokenPayload = {
-  sub?: string;
-  email?: string;
-};
+import { verifyIdToken } from "@/lib/verifyIdToken";
 
 export async function POST(req: NextRequest) {
   try {
@@ -25,13 +20,11 @@ export async function POST(req: NextRequest) {
     /**
      * 2️⃣ Decode token
      */
-    const decoded = jwt.decode(idToken) as IdTokenPayload | null;
-
-    if (!decoded?.sub || !decoded?.email) {
-      return NextResponse.json(
-        { error: "Invalid token" },
-        { status: 401 }
-      );
+    let decoded;
+    try {
+      decoded = await verifyIdToken(idToken);
+    } catch {
+      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
     const { sub, email } = decoded;

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { prisma } from "@/lib/prisma";
 import { getSessionExpiry } from "@/lib/session";
+import { verifyIdToken } from "@/lib/verifyIdToken";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -54,16 +54,11 @@ export async function GET(req: NextRequest) {
   const tokenData = await tokenRes.json();
   const idToken = tokenData.id_token;
 
-  const decoded = jwt.decode(idToken) as {
-    sub?: string;
-    email?: string;
-    email_verified?: boolean;
-  } | null;
-
-  if (!decoded?.sub || !decoded.email) {
-    return NextResponse.redirect(
-      `${process.env.AUTH0_BASE_URL}/login`
-    );
+  let decoded;
+  try {
+    decoded = await verifyIdToken(idToken);
+  } catch {
+    return NextResponse.redirect(`${process.env.AUTH0_BASE_URL}/login`);
   }
 
   /**
@@ -135,6 +130,7 @@ export async function GET(req: NextRequest) {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
+    secure: process.env.NODE_ENV === "production",
   });
 
   return res;

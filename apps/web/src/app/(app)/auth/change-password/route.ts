@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import jwt from "jsonwebtoken";
 import { prisma } from "@/lib/prisma";
-
-type IdTokenPayload = {
-  sub?: string;
-  email?: string;
-};
+import { verifyIdToken } from "@/lib/verifyIdToken";
 
 export async function GET(req: NextRequest) {
   try {
@@ -17,8 +12,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.redirect(new URL("/login", req.url));
     }
 
-    const decoded = jwt.decode(idToken) as IdTokenPayload | null;
-    if (!decoded?.sub || !decoded.email) {
+    let decoded;
+    try {
+      decoded = await verifyIdToken(idToken);
+    } catch {
       return NextResponse.redirect(new URL("/login", req.url));
     }
 

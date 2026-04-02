@@ -23,6 +23,12 @@ docker start qual-postgres
 # Access Prisma Studio
 npx prisma studio
 
+# Run the web app
+From the apps/web directory:
+cd "/Users/ernest/Marketing AI/market_research_agent/apps/web"
+npm run dev
+Then open http://localhost:3000.
+
 # Single session enforecement
 Add this block of code for all authenticated pages
 
@@ -45,6 +51,18 @@ docker exec -it qual-postgres psql -U postgres -d qual_db
 
 # To create project structure run this command from the root folder
 tree -I "node_modules" > structure.txt
+
+# JWT verification
+Auth0 ID tokens (auth0_id_token cookie) are verified using RS256 signature validation
+via the shared utility src/lib/verifyIdToken.ts. It fetches Auth0's public keys from
+/.well-known/jwks.json (keys are cached in memory) and validates the signature,
+audience (AUTH0_CLIENT_ID), and issuer (AUTH0_ISSUER_BASE_URL).
+
+Use verifyIdToken() instead of jwt.decode() anywhere the auth0_id_token cookie is read.
+Never trust the token's payload without calling verifyIdToken() first.
+
+Affected routes: api/auth/callback, api/auth/bootstrap,
+api/auth/session/override, (app)/auth/change-password
 
 # Revoked sessions terminate on next interaction by design.
 
