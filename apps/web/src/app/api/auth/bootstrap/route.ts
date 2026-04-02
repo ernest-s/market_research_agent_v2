@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { verifyIdToken } from "@/lib/verifyIdToken";
+import { resolveOrCreateUser } from "@/lib/resolveOrCreateUser";
 
 export async function POST(req: NextRequest) {
   try {
@@ -26,44 +27,16 @@ export async function POST(req: NextRequest) {
     const { sub, email } = decoded;
 
     /**
-     * 2️⃣ Resolve user (Auth0 ↔ DB reconciliation)
+     * 2️⃣ Resolve or create user, then fetch with relations
      */
-    let user = await prisma.user.findUnique({
-      where: { auth0Sub: sub },
+    const baseUser = await resolveOrCreateUser(sub, email);
+    const user = await prisma.user.findUniqueOrThrow({
+      where: { id: baseUser.id },
       include: {
         company: true,
         corporateAccount: true,
       },
     });
-
-    if (!user) {
-      const existingByEmail = await prisma.user.findUnique({
-        where: { email },
-      });
-
-      if (existingByEmail) {
-        user = await prisma.user.update({
-          where: { id: existingByEmail.id },
-          data: { auth0Sub: sub },
-          include: {
-            company: true,
-            corporateAccount: true,
-          },
-        });
-      } else {
-        user = await prisma.user.create({
-          data: {
-            auth0Sub: sub,
-            email,
-            status: "ACTIVE",
-          },
-          include: {
-            company: true,
-            corporateAccount: true,
-          },
-        });
-      }
-    }
 
     /**
      * 3️⃣ Determine account context (data only)

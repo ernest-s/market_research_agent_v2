@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionExpiry, revokeUserSessions } from "@/lib/session";
 import { verifyIdToken } from "@/lib/verifyIdToken";
+import { resolveOrCreateUser } from "@/lib/resolveOrCreateUser";
 
 export async function POST(req: NextRequest) {
   try {
@@ -30,32 +31,9 @@ export async function POST(req: NextRequest) {
     const { sub, email } = decoded;
 
     /**
-     * 3️⃣ Resolve user (same logic as bootstrap)
+     * 3️⃣ Resolve or create user
      */
-    let user = await prisma.user.findUnique({
-      where: { auth0Sub: sub },
-    });
-
-    if (!user) {
-      const existingByEmail = await prisma.user.findUnique({
-        where: { email },
-      });
-
-      if (existingByEmail) {
-        user = await prisma.user.update({
-          where: { id: existingByEmail.id },
-          data: { auth0Sub: sub },
-        });
-      } else {
-        // This should not normally happen, but keep it safe
-        user = await prisma.user.create({
-          data: {
-            auth0Sub: sub,
-            email,
-          },
-        });
-      }
-    }
+    const user = await resolveOrCreateUser(sub, email);
 
     /**
      * 4️⃣ Revoke ALL existing sessions for this user

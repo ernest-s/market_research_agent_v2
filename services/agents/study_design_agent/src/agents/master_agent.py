@@ -122,13 +122,11 @@ def get_challenges_opportunities(state, counter=0):
         if "opportunities" in challenges_opportunities:
             state["study_brief"]["opportunities"] = challenges_opportunities["opportunities"]
         else:
-            state = get_challenges_opportunities(state, counter=1)
+            state = get_challenges_opportunities(state, counter + 1)
         state["status"] = "confirm_challenges_opportunities"
     else:
         state["status"] = "failure"
         state["agent_message"] = "Get challenges opportunities failed."
-    return state
-
     return state
 
 def modify_challenges_opportunities(state):

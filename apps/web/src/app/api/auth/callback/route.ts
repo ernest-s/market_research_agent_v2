@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getSessionExpiry } from "@/lib/session";
 import { verifyIdToken } from "@/lib/verifyIdToken";
+import { resolveOrCreateUser } from "@/lib/resolveOrCreateUser";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -62,41 +63,9 @@ export async function GET(req: NextRequest) {
   }
 
   /**
-   * 1️⃣ Resolve user safely (Option A)
-   *
-   * Priority:
-   * 1. auth0Sub match
-   * 2. email match → attach new auth0Sub
-   * 3. create new user
+   * 1️⃣ Resolve or create user
    */
-  let user = await prisma.user.findUnique({
-    where: { auth0Sub: decoded.sub },
-  });
-
-  if (!user) {
-    const existingByEmail = await prisma.user.findUnique({
-      where: { email: decoded.email },
-    });
-
-    if (existingByEmail) {
-      // Attach new identity (overwrite auth0Sub)
-      user = await prisma.user.update({
-        where: { id: existingByEmail.id },
-        data: {
-          auth0Sub: decoded.sub,
-        },
-      });
-    } else {
-      // Create brand-new user
-      user = await prisma.user.create({
-        data: {
-          auth0Sub: decoded.sub,
-          email: decoded.email,
-          status: "ACTIVE",
-        },
-      });
-    }
-  }
+  const user = await resolveOrCreateUser(decoded.sub, decoded.email);
 
   /**
    * 2️⃣ ALWAYS create a NEW app session
