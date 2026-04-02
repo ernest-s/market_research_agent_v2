@@ -30,3 +30,5 @@ They are not part of the Next.js build.
 | `AUTH0_MANAGEMENT_DOMAIN` | `AUTH0_MANAGEMENT_DOMAIN` in `apps/web/.env.local` |
 | `AUTH0_MANAGEMENT_CLIENT_ID` | `AUTH0_MANAGEMENT_CLIENT_ID` in `apps/web/.env.local` |
 | `AUTH0_MANAGEMENT_CLIENT_SECRET` | `AUTH0_MANAGEMENT_CLIENT_SECRET` in `apps/web/.env.local` |
+
+
