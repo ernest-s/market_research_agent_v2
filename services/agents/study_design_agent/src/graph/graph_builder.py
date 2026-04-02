@@ -1,5 +1,5 @@
 from langgraph.graph import StateGraph, START, END
-from state import State
+from .state import State
 from src.agents.dialogue_agent import DialogueAgent
 from src.agents.master_agent import MasterAgent
 
